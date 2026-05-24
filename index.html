@@ -23,10 +23,16 @@
     </header>
 
     <nav class="world-map" id="zone-map" aria-label="Локации"></nav>
+
+    <div class="rpg-bar">
+      <div class="materials-strip" id="materials-strip"></div>
+      <div class="equip-strip" id="equip-strip"></div>
+      <div class="activity-bar" id="activity-bar"></div>
+    </div>
+
     <div class="zone-progress-bar">
-      <span id="zone-desc">Двор — олеги на лавочке</span>
-      <div class="zp-track"><div class="zp-fill" id="zone-fill"></div></div>
-      <span id="zone-progress-text">0 / 8</span>
+      <span id="zone-desc">Двор — руби дерево и бей олегов</span>
+      <span id="zone-progress-text">Жми локацию на карте</span>
     </div>
 
     <main class="main-row">
@@ -42,7 +48,6 @@
           </div>
 
           <p class="boss-warn hidden" id="boss-warn">⚠ Босс сбежит через <b id="boss-timer">30</b> сек!</p>
-          <p class="zone-boss-warn hidden" id="zone-boss-warn">👑 Следующий — БОСС ЛОКАЦИИ!</p>
 
           <div class="stage bg-yard" id="stage">
             <button class="spot spot-l hidden" id="weak-left" type="button">x3</button>
@@ -64,7 +69,7 @@
           </div>
           <div class="skills" id="skills-dock"></div>
         </div>
-        <p class="tip-line" id="event-ticker">Кликай → бабки → качай хуй</p>
+        <p class="tip-line" id="event-ticker">Кликай → бабки → крафти → ебашь</p>
       </section>
 
       <aside class="shop-zone">
@@ -75,6 +80,8 @@
         <nav class="tabs">
           <button class="tab active" data-tab="weapon">Хуй</button>
           <button class="tab" data-tab="crew">Братва</button>
+          <button class="tab" data-tab="craft">Крафт</button>
+          <button class="tab" data-tab="gear">Шмот</button>
           <button class="tab" data-tab="more">Ещё</button>
         </nav>
         <div class="shop-list" id="shop-content"></div>

@@ -1,8 +1,11 @@
 import {
   ZONES, ENEMY_TYPES, pickOlegSkin, OLEG_SKINS, ELEMENTS, MUTATORS, WEAPONS, CREW,
   ELEMENT_UPGRADES, RELICS, RESEARCH, SKILLS, ARTIFACTS,
-  CONSUMABLES, CHALLENGES, TALENTS, EVENTS, cost,
+  CONSUMABLES, CHALLENGES, TALENTS, EVENTS, cost, defaultState,
 } from "./data.js";
+import {
+  ITEMS, RECIPES, ZONE_ACTIVITIES, masteryLevel,
+} from "./rpg-data.js";
 
 export class Game {
   constructor(state) {
@@ -121,12 +124,17 @@ export class Game {
     const weight = WEAPONS.find((x) => x.id === "weight");
     dmg *= weight ? weight.fx(this.lv(this.state.weapons, "weight")) : 1;
 
+    const eq = this.equipStats();
+    dmg += eq.dmg;
+    dmg *= this.masteryCombatMult();
+
     dmg *= this.comboMult();
     dmg *= this.prestigeMult();
     dmg *= this.relicMult("dmg");
     dmg *= this.researchMult("r_dmg");
     dmg *= this.talentMult("dmg");
     dmg *= this.artifactMult().dmg;
+    dmg *= this.zoneBonus("dmg");
 
     if (this.overdrive >= 100) dmg *= 2.5;
     if (this.state.buffs.slap) dmg *= 8;
@@ -163,6 +171,7 @@ export class Game {
     const c = WEAPONS.find((x) => x.id === "crit");
     let ch = c ? c.fx(this.lv(this.state.weapons, "crit")) : 0.05;
     ch += this.artifactMult().crit;
+    ch += this.equipStats().crit;
     if (this.state.event?.crit) ch += this.state.event.crit;
     return Math.min(0.75, ch);
   }
@@ -299,13 +308,16 @@ export class Game {
     if (this.state.mutator?.id === "greedy") coins *= 2;
 
     coins *= this.zoneBonus("coin");
+    coins *= 1 + this.equipStats().coin;
     if (this.state.zoneIdx >= 6) coins *= 2;
     coins = Math.floor(coins);
     this.state.coins += coins;
     this.state.coinsEarned += coins;
 
     let xp = Math.floor(12 * this.state.wave * et.xp * this.relicMult("xp"));
+    xp = Math.floor(xp * this.zoneBonus("xp"));
     this.gainXp(xp);
+    this.gainMastery("combat", Math.max(2, Math.floor(xp / 4)));
 
     let ess = Math.floor(1 + this.state.wave / 5);
     if (et.tag === "БОСС") ess *= 3;
@@ -320,21 +332,6 @@ export class Game {
     this.killStreak++;
     this.streakT = 8000;
 
-    this.state.zoneKills++;
-    const z = this.zone();
-    if (this.state.zoneKills >= z.kills && this.state.enemyType === "boss") {
-      if (this.state.zoneIdx < ZONES.length - 1) {
-        this.state.zoneIdx++;
-        this.state.zoneKills = 0;
-        if (!this.state.unlockedZones.includes(this.state.zoneIdx))
-          this.state.unlockedZones.push(this.state.zoneIdx);
-        this.emit("zoneClear", ZONES[this.state.zoneIdx]);
-      }
-    } else if (this.state.zoneKills >= z.kills && !this.state.zoneBossPending) {
-      this.state.zoneBossPending = true;
-      this.emit("zoneBossSoon");
-    }
-
     this.state.killsInWave++;
     if (this.state.killsInWave >= 14) {
       this.state.wave++;
@@ -343,10 +340,24 @@ export class Game {
       this.emit("wave", this.state.wave);
     }
 
+    this.dropMaterials();
     this.tryLoot();
     this.checkChallenge();
     this.spawnEnemy();
     this.emit("kill", { coins, ess });
+  }
+
+  dropMaterials() {
+    const z = ZONES[this.state.zoneIdx];
+    const scav = this.masteryLv("scavenge");
+    if (Math.random() < 0.14 + scav * 0.012) {
+      this.addMaterial("hide", 1 + (Math.random() < 0.25 ? 1 : 0));
+    }
+    if (z.id === "beach" && Math.random() < 0.1 + scav * 0.01) this.addMaterial("scale", 1);
+    if (z.id === "pod" && Math.random() < 0.16 + scav * 0.015) this.addMaterial("scrap", 1);
+    if (z.id === "yard" && Math.random() < 0.12) this.addMaterial("wood", 1);
+    if (z.id === "space" && Math.random() < 0.07) this.addMaterial("crystal", 1);
+    if (z.id === "hell" && Math.random() < 0.08) this.addMaterial("ore", 1);
   }
 
   tryLoot() {
@@ -390,7 +401,8 @@ export class Game {
     this.comboT = this.comboWindow();
     if (this.combo > this.state.maxCombo) this.state.maxCombo = this.combo;
 
-    const heatGain = 4 - (this.lv(this.state.crew, "it") * 0.15);
+    const heatRed = this.equipStats().heatRed + (this.masteryLv("endurance") - 1) * 0.03;
+    const heatGain = (4 - (this.lv(this.state.crew, "it") * 0.15)) * Math.max(0.35, 1 - heatRed);
     this.heat = Math.min(100, this.heat + Math.max(1, heatGain));
     const overGain = (8 + this.combo * 0.05) * this.researchMult("r_over");
     this.overdrive = Math.min(100, this.overdrive + overGain);
@@ -511,6 +523,8 @@ export class Game {
       prestigePts: this.state.prestigePts, prestigeCount: this.state.prestigeCount,
       souls: this.state.souls, talents: this.state.talents, achievements: this.state.achievements,
       research: this.state.research, artifacts: this.state.artifacts,
+      materials: this.state.materials, items: this.state.items,
+      equip: this.state.equip, masteries: this.state.masteries,
       clicks: this.state.clicks, damage: this.state.damage, coinsEarned: this.state.coinsEarned,
       crits: this.state.crits, bossKills: this.state.bossKills, maxCombo: this.state.maxCombo,
       rageMaxed: this.state.rageMaxed, settings: this.state.settings, unlockedZones: this.state.unlockedZones,
@@ -626,6 +640,10 @@ export class Game {
       if (this.state.eventT <= 0) { this.state.event = null; this.emit("eventEnd"); }
     }
 
+    if (this.state.activityCd > 0) {
+      this.state.activityCd = Math.max(0, this.state.activityCd - sec);
+    }
+
     this._eventTick += dt;
     if (this._eventTick > 45000 && !this.state.event) {
       this._eventTick = 0;
@@ -635,27 +653,157 @@ export class Game {
     this.emit("tick");
   }
 
+  getEquipped(slot) {
+    const id = this.state.equip[slot];
+    return id ? ITEMS[id] : null;
+  }
+
+  equipStats() {
+    let dmg = 0, crit = 0, coin = 0, fishBonus = 0, heatRed = 0;
+    for (const slot of Object.keys(this.state.equip)) {
+      const it = this.getEquipped(slot);
+      if (!it) continue;
+      if (it.dmg) dmg += it.dmg;
+      if (it.crit) crit += it.crit;
+      if (it.coin) coin += it.coin;
+      if (it.fishBonus) fishBonus += it.fishBonus;
+      if (it.heatRed) heatRed += it.heatRed;
+    }
+    return { dmg, crit, coin, fishBonus, heatRed };
+  }
+
+  masteryLv(id) {
+    return masteryLevel(this.state.masteries[id] || 0).lv;
+  }
+
+  masteryCombatMult() {
+    return 1 + (this.masteryLv("combat") - 1) * 0.02;
+  }
+
+  canTravel(idx) {
+    const z = ZONES[idx];
+    if (!z) return false;
+    return this.state.level >= (z.unlockLv || 1);
+  }
+
+  travelTo(idx) {
+    if (!this.canTravel(idx) || idx === this.state.zoneIdx) return false;
+    this.state.zoneIdx = idx;
+    this.emit("travel", ZONES[idx]);
+    this.spawnEnemy();
+    return true;
+  }
+
+  addMaterial(key, n) {
+    this.state.materials[key] = (this.state.materials[key] || 0) + n;
+    this.emit("material", { key, n });
+  }
+
+  addItem(itemId, n = 1) {
+    this.state.items[itemId] = (this.state.items[itemId] || 0) + n;
+  }
+
+  gainMastery(id, xp) {
+    this.state.masteries[id] = (this.state.masteries[id] || 0) + xp;
+    this.emit("mastery", id);
+  }
+
+  canCraft(recipeId) {
+    const r = RECIPES.find((x) => x.id === recipeId);
+    if (!r) return false;
+    if (this.masteryLv("craft") < r.craftLv) return false;
+    for (const [k, n] of Object.entries(r.in)) {
+      if ((this.state.materials[k] || 0) < n) return false;
+    }
+    return true;
+  }
+
+  craft(recipeId) {
+    if (!this.canCraft(recipeId)) return false;
+    const r = RECIPES.find((x) => x.id === recipeId);
+    for (const [k, n] of Object.entries(r.in)) this.state.materials[k] -= n;
+    this.addItem(r.out, 1);
+    this.gainMastery("craft", 15 + r.craftLv * 5);
+    this.emit("craft", r);
+    return true;
+  }
+
+  equipItem(itemId) {
+    const it = ITEMS[itemId];
+    if (!it || !(this.state.items[itemId] > 0)) return false;
+    const old = this.state.equip[it.slot];
+    if (old) this.addItem(old, 1);
+    this.state.equip[it.slot] = itemId;
+    this.state.items[itemId]--;
+    if (this.state.items[itemId] <= 0) delete this.state.items[itemId];
+    this.emit("equip", itemId);
+    return true;
+  }
+
+  unequip(slot) {
+    const id = this.state.equip[slot];
+    if (!id) return false;
+    this.addItem(id, 1);
+    this.state.equip[slot] = null;
+    this.emit("unequip", slot);
+    return true;
+  }
+
+  fish() {
+    const zone = ZONES[this.state.zoneIdx];
+    if (!ZONE_ACTIVITIES[zone.id]?.fish || this.state.activityCd > 0) return false;
+
+    const fishLv = this.masteryLv("fishing");
+    const eq = this.equipStats();
+    const chance = 0.5 + fishLv * 0.025 + eq.fishBonus;
+    let caught = 0;
+
+    if (Math.random() < chance) {
+      caught = 1 + Math.floor(Math.random() * (1 + fishLv / 3));
+      this.addMaterial("fish", caught);
+      this.gainMastery("fishing", 8 + caught * 2);
+    } else {
+      this.gainMastery("fishing", 3);
+    }
+    this.state.activityCd = 2;
+    this.emit("fish", caught);
+    return true;
+  }
+
+  gather() {
+    const zone = ZONES[this.state.zoneIdx];
+    const act = ZONE_ACTIVITIES[zone.id];
+    if (!act?.gather || this.state.activityCd > 0) return false;
+
+    const scav = this.masteryLv("scavenge");
+    const amount = 1 + Math.floor(Math.random() * (2 + scav / 4));
+    this.addMaterial(act.gather, amount);
+    this.gainMastery("scavenge", 6 + amount);
+    if (act.gather === "wood") this.gainMastery("craft", 2);
+    this.state.activityCd = 1.8;
+    this.emit("gather", { mat: act.gather, amount });
+    return true;
+  }
+
+  rest() {
+    const zone = ZONES[this.state.zoneIdx];
+    if (!ZONE_ACTIVITIES[zone.id]?.rest || this.state.activityCd > 0) return false;
+    this.heat = 0;
+    this.rage = Math.min(100, this.rage + 15);
+    this.gainMastery("endurance", 10);
+    this.state.activityCd = 3;
+    this.emit("rest");
+    return true;
+  }
+
+  zoneActivities() {
+    return ZONE_ACTIVITIES[ZONES[this.state.zoneIdx].id] || {};
+  }
+
   triggerEvent() {
     const e = EVENTS[Math.floor(Math.random() * EVENTS.length)];
     this.state.event = { ...e };
     this.state.eventT = e.dur;
     this.emit("event", e);
   }
-}
-
-function defaultState() {
-  return {
-    coins: 0, souls: 0, essence: 0, prestigePts: 0, prestigeCount: 0,
-    wave: 1, zoneIdx: 0, zoneKills: 0, zoneBossPending: false, killsInWave: 0, level: 1, xp: 0,
-    weapons: {}, crew: {}, elements: {}, relics: {}, research: {}, talents: [],
-    artifacts: [null, null, null], inventory: {},
-    clicks: 0, damage: 0, coinsEarned: 0, crits: 0, bossKills: 0,
-    maxCombo: 0, rageMaxed: 0, weakHits: 0, parryDone: false,
-    achievements: [], settings: { sound: true, fx: true, save: 30 },
-    enemyHp: 80, enemyMaxHp: 80, enemyShield: 0,
-    enemyType: "normal", enemyElement: "none",
-    bossTimer: 0, bossPhase: 1, mutator: null,
-    skillCd: {}, buffs: {}, event: null, eventT: 0,
-    challenge: null, challengeProg: {}, unlockedZones: [0], lastSave: Date.now(),
-  };
 }

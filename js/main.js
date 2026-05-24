@@ -2,6 +2,7 @@ import { loadSave, saveGame } from "./save.js";
 import { Game } from "./game.js";
 import { UI } from "./ui.js";
 import { ACHIEVEMENTS } from "./data.js";
+import { MATERIALS } from "./rpg-data.js";
 
 const state = loadSave();
 const game = new Game(state);
@@ -50,6 +51,24 @@ game.on((ev, data) => {
       break;
     case "zoneBossSoon":
       ui.toast("Босс локации на подходе — готовь жопу!");
+      break;
+    case "travel":
+      ui.toast(`Локация: ${data.icon} ${data.name}`);
+      break;
+    case "craft":
+      ui.toast(`Скрафтил: ${data.name}!`);
+      ui.renderMaterials();
+      break;
+    case "fish":
+      ui.toast(data > 0 ? `Поймал рыбу: +${data}` : "Пусто... но опыт есть");
+      break;
+    case "gather":
+      ui.toast(`+${data.amount} ${MATERIALS[data.mat]?.name || data.mat}`);
+      break;
+    case "rest":
+      ui.toast("Пропарился — жар сброс!");
+      break;
+    case "material":
       break;
     case "prestige":
       ui.toast(`Престиж +${data}★. Начинаем заново, но мощнее.`);

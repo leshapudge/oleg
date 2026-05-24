@@ -1,13 +1,13 @@
-export const SAVE_KEY = "oleg_simulator_save_v3";
+export const SAVE_KEY = "oleg_simulator_save_v4";
 
 export const ZONES = [
-  { id: "yard", name: "Двор", icon: "🏠", desc: "Олеги на лавочке. Старт.", hp: 1, coins: 1, kills: 8, bg: "bg-yard", bonus: "+0% бабок" },
-  { id: "pod", name: "Подъезд", icon: "🚪", desc: "Запах мочи и олеги.", hp: 1.35, coins: 1.15, kills: 10, bg: "bg-pod", bonus: "+5% бабок" },
-  { id: "beach", name: "Пляж", icon: "🏖", desc: "Загорелые жопы.", hp: 1.8, coins: 1.3, kills: 12, bg: "bg-beach", bonus: "+10% бабок" },
-  { id: "office", name: "Офис", icon: "🏢", desc: "Олеги в галстуках.", hp: 2.4, coins: 1.45, kills: 14, bg: "bg-office", bonus: "+15% XP" },
-  { id: "banya", name: "Баня", icon: "🧖", desc: "Горячие жопы.", hp: 3.2, coins: 1.65, kills: 16, bg: "bg-banya", bonus: "+20% урон" },
-  { id: "space", name: "Космос", icon: "🚀", desc: "Олеги на орбите.", hp: 4.5, coins: 1.95, kills: 18, bg: "bg-space", bonus: "+25% авто-DPS" },
-  { id: "hell", name: "Ад Олега", icon: "🔥", desc: "Финал. Пиздец.", hp: 7, coins: 2.6, kills: 20, bg: "bg-hell", bonus: "x2 всё" },
+  { id: "yard", name: "Двор", icon: "🏠", desc: "Дерево и олеги.", hp: 1, coins: 1, bg: "bg-yard", unlockLv: 1 },
+  { id: "pod", name: "Подъезд", icon: "🚪", desc: "Хлам и вонь.", hp: 1.35, coins: 1.15, bg: "bg-pod", unlockLv: 1 },
+  { id: "beach", name: "Пляж", icon: "🏖", desc: "Рыбалка + жопы.", hp: 1.8, coins: 1.3, bg: "bg-beach", unlockLv: 1 },
+  { id: "office", name: "Офис", icon: "🏢", desc: "Крафт-стол.", hp: 2.4, coins: 1.45, bg: "bg-office", unlockLv: 1 },
+  { id: "banya", name: "Баня", icon: "🧖", desc: "Сброс жара.", hp: 3.2, coins: 1.65, bg: "bg-banya", unlockLv: 1 },
+  { id: "space", name: "Космос", icon: "🚀", desc: "Кристаллы.", hp: 4.5, coins: 1.95, bg: "bg-space", unlockLv: 1 },
+  { id: "hell", name: "Ад", icon: "🔥", desc: "Финал.", hp: 7, coins: 2.6, bg: "bg-hell", unlockLv: 1 },
 ];
 
 export const ENEMY_TYPES = {
@@ -234,7 +234,12 @@ export function defaultState() {
     eventT: 0,
     challenge: null,
     challengeProg: {},
-    unlockedZones: [0],
+    materials: {},
+    items: {},
+    equip: { weapon: null, armor: null, tool: null, trinket: null },
+    masteries: { combat: 0, fishing: 0, craft: 0, endurance: 0, scavenge: 0 },
+    activityCd: 0,
+    unlockedZones: [0, 1, 2, 3, 4, 5, 6],
     lastSave: Date.now(),
   };
 }
@@ -257,7 +262,13 @@ export function migrateState(raw) {
   }
   if (raw.prestigePoints != null) raw.prestigePts = raw.prestigePoints;
   if (raw.playerLevel != null) raw.level = raw.playerLevel;
-    if (!raw.zoneKills) raw.zoneKills = 0;
-    if (raw.zoneBossPending == null) raw.zoneBossPending = false;
+  if (raw.totalClicks != null) raw.clicks = raw.totalClicks;
+  if (!raw.materials) raw.materials = {};
+  if (!raw.items) raw.items = {};
+  if (!raw.equip) raw.equip = { weapon: null, armor: null, tool: null, trinket: null };
+  if (!raw.masteries) raw.masteries = { combat: 0, fishing: 0, craft: 0, endurance: 0, scavenge: 0 };
+  if (raw.activityCd == null) raw.activityCd = 0;
+  if (!raw.zoneKills) raw.zoneKills = 0;
+  if (raw.zoneBossPending == null) raw.zoneBossPending = false;
   return { ...d, ...raw, settings: { sound: true, fx: true, save: 30, ...raw.settings } };
 }

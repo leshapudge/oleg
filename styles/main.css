@@ -77,8 +77,12 @@ body {
   border: 2px solid var(--line);
   background: #0a120a;
   opacity: .45;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
 }
-.map-node.done { opacity: .75; border-color: var(--gold); }
+.map-node.done { opacity: .85; border-color: var(--gold); }
+.map-node.done:hover { opacity: 1; border-color: var(--lime); }
 .map-node.current {
   opacity: 1;
   border-color: var(--lime);
@@ -109,6 +113,80 @@ body {
   border: 1px solid var(--line);
 }
 .zp-fill { height: 100%; width: 0%; background: var(--lime); transition: width .2s; }
+
+.rpg-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 2px solid var(--line);
+}
+.materials-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: .68rem;
+}
+.mat-chip {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  background: #0a120a;
+  color: var(--gold);
+}
+.equip-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: .62rem;
+}
+.eq-slot {
+  padding: 4px 8px;
+  border: 1px dashed var(--line);
+  background: #080c08;
+}
+.eq-slot small { display: block; color: var(--muted); font-size: .55rem; }
+.activity-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.act-btn {
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  background: #0a120a;
+  color: var(--lime);
+  font-family: var(--mono);
+  font-size: .68rem;
+  cursor: pointer;
+}
+.act-btn:hover:not(:disabled) { border-color: var(--lime); background: rgba(184,255,60,.08); }
+.act-btn:disabled { opacity: .45; cursor: not-allowed; }
+.gear-slot {
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 2px solid var(--line);
+  background: #0a120a;
+  font-size: .68rem;
+}
+.btn-mini {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  background: #141a14;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .6rem;
+}
+.mastery-row {
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 2px solid var(--line);
+  background: #0a120a;
+  font-size: .65rem;
+}
+.mastery-row .xp-bar { height: 6px; margin-top: 4px; }
+.warn { color: var(--red); }
 
 .zone-boss-warn {
   text-align: center;
@@ -374,12 +452,12 @@ body {
 .tabs { display: flex; gap: 4px; }
 .tab {
   flex: 1;
-  padding: 10px;
+  padding: 8px 4px;
   border: 2px solid var(--line);
   background: #0a120a;
   color: var(--muted);
   font-family: var(--display);
-  font-size: .75rem;
+  font-size: .62rem;
   cursor: pointer;
 }
 .tab.active, .tab:hover {

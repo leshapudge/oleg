@@ -2,11 +2,20 @@ import {
   WEAPONS, CREW, RELICS, SKILLS, OLEG_SKINS, ENEMY_TYPES,
   ZONES, SIMPLE_TIPS, cost, fmt,
 } from "./data.js";
+import {
+  MATERIALS, ITEMS, RECIPES, MASTERIES, masteryLevel,
+} from "./rpg-data.js";
 import { buildOlegSvg, playHitAnim } from "./sprites.js";
 
 const HIT_WORDS = ["БАХ!", "ПЛЮХ!", "ХРЯСЬ!", "ЕБАШ!", "В ЖОПУ!", "ОЙ-ой!"];
 const CRIT_WORDS = ["ПИЗДЕЦ!", "РАЗЪЁБ!", "НАХУЙ!", "КРИТ, БЛЯ!"];
 const WEAK_WORDS = ["В ЯБЛОЧКО!", "ТРИПЛ!", "ПОПАЛ!"];
+const SLOTS = [
+  { id: "weapon", label: "Оружие" },
+  { id: "armor", label: "Броня" },
+  { id: "tool", label: "Инструмент" },
+  { id: "trinket", label: "Талисман" },
+];
 
 export class UI {
   constructor(game) {
@@ -20,8 +29,8 @@ export class UI {
 
   cache() {
     const ids = [
-      "coins", "place-line", "zone-map", "zone-desc", "zone-fill", "zone-progress-text",
-      "zone-boss-warn", "stage",
+      "coins", "place-line", "zone-map", "zone-desc", "zone-progress-text",
+      "materials-strip", "equip-strip", "activity-bar", "stage",
       "enemy-badge", "enemy-name", "enemy-quote",
       "enemy-hp-text", "enemy-hp-fill", "boss-warn", "boss-timer",
       "weak-left", "weak-right", "parry-prompt", "oleg-char",
@@ -120,29 +129,96 @@ export class UI {
     const s = this.g.state;
     const z = this.g.zone();
     this.el["zone-map"].innerHTML = ZONES.map((zone, i) => {
-      const cls = i === s.zoneIdx ? "current" : s.unlockedZones.includes(i) ? "done" : "locked";
-      return `<div class="map-node ${cls}" title="${zone.desc} · ${zone.bonus}">
+      const can = this.g.canTravel(i);
+      const cls = i === s.zoneIdx ? "current" : can ? "done" : "locked";
+      return `<button type="button" class="map-node ${cls}" data-zone="${i}" title="${zone.desc}">
         <span class="mn-ico">${zone.icon}</span>
         <span class="mn-name">${zone.name}</span>
-      </div>`;
+      </button>`;
     }).join("");
 
-    this.el["zone-desc"].textContent = `${z.icon} ${z.name} — ${z.desc} (${z.bonus})`;
-    const pct = Math.min(100, (s.zoneKills / z.kills) * 100);
-    this.el["zone-fill"].style.width = pct + "%";
-    this.el["zone-progress-text"].textContent = `${s.zoneKills} / ${z.kills} олегов`;
+    this.el["zone-map"].querySelectorAll(".map-node").forEach((btn) => {
+      btn.onclick = () => {
+        const idx = +btn.dataset.zone;
+        if (this.g.travelTo(idx)) this.update(); else if (!this.g.canTravel(idx)) {
+          this.toast(`Нужен ур. ${ZONES[idx].unlockLv}`);
+        }
+      };
+    });
+
+    this.el["zone-desc"].textContent = `${z.icon} ${z.name} — ${z.desc}`;
+    this.el["zone-progress-text"].textContent = `Урон x${this.g.zoneBonus("dmg").toFixed(2)} · бабки x${this.g.zoneBonus("coin").toFixed(2)}`;
     this.el.stage.className = "stage " + z.bg;
-    this.el["zone-boss-warn"].classList.toggle("hidden", !s.zoneBossPending);
+  }
+
+  renderMaterials() {
+    const mats = this.g.state.materials;
+    this.el["materials-strip"].innerHTML = Object.entries(MATERIALS).map(([k, m]) => {
+      const n = mats[k] || 0;
+      return `<span class="mat-chip" title="${m.name}">${m.icon} ${n}</span>`;
+    }).join("");
+  }
+
+  renderEquipStrip() {
+    const eq = this.g.state.equip;
+    this.el["equip-strip"].innerHTML = SLOTS.map(({ id, label }) => {
+      const itemId = eq[id];
+      const it = itemId ? ITEMS[itemId] : null;
+      return `<span class="eq-slot" title="${label}">
+        <small>${label}</small>
+        ${it ? `${it.icon} ${it.name}` : "—"}
+      </span>`;
+    }).join("");
+  }
+
+  renderActivities() {
+    const act = this.g.zoneActivities();
+    const cd = this.g.state.activityCd || 0;
+    const btns = [];
+
+    if (act.gather) {
+      btns.push({ id: "gather", label: act.gatherName || "Собрать", icon: MATERIALS[act.gather]?.icon || "📦" });
+    }
+    if (act.fish) btns.push({ id: "fish", label: "Рыбачить", icon: "🎣" });
+    if (act.rest) btns.push({ id: "rest", label: act.restName || "Отдых", icon: "🧖" });
+    if (act.craft) btns.push({ id: "craft-tab", label: "Крафт", icon: "🔨" });
+
+    this.el["activity-bar"].innerHTML = btns.map((b) =>
+      `<button type="button" class="act-btn" data-act="${b.id}" ${cd > 0 && b.id !== "craft-tab" ? "disabled" : ""}>
+        ${b.icon} ${b.label}${cd > 0 && b.id !== "craft-tab" ? ` (${Math.ceil(cd)}с)` : ""}
+      </button>`
+    ).join("");
+
+    this.el["activity-bar"].querySelectorAll(".act-btn").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.dataset.act;
+        if (id === "craft-tab") {
+          document.querySelector('.tab[data-tab="craft"]')?.click();
+          return;
+        }
+        if (id === "fish") {
+          if (this.g.fish()) this.update();
+        } else if (id === "gather") {
+          if (this.g.gather()) this.update();
+        } else if (id === "rest") {
+          if (this.g.rest()) this.update();
+        }
+      };
+    });
+  }
+
+  recipeCost(r) {
+    return Object.entries(r.in).map(([k, n]) => `${MATERIALS[k]?.icon || k}${n}`).join(" ");
   }
 
   renderShop() {
     const s = this.g.state;
     let html = "";
 
-    const row = (ico, name, desc, price, locked, cat, id) => `
+    const row = (ico, name, desc, price, locked, cat, id, extra = "") => `
       <div class="shop-item ${locked ? "locked" : ""}" data-cat="${cat}" data-id="${id}">
         <span class="si-ico">${ico}</span>
-        <div><b>${name}</b><br><small>${desc}</small></div>
+        <div><b>${name}</b><br><small>${desc}</small>${extra}</div>
         <span class="si-price">${price}</span>
       </div>`;
 
@@ -157,8 +233,53 @@ export class UI {
         const l = this.g.lv(s.crew, c.id);
         return row(c.icon, c.name, c.desc, fmt(cost(c, l)) + "₽", s.coins < cost(c, l), "crew", c.id);
       }).join("");
+    } else if (this.tab === "craft") {
+      const craftLv = this.g.masteryLv("craft");
+      html = `<p class="shop-note">Крафт ур. ${craftLv}. Убивай, собирай, рыбачь — качай мастерство.</p>`;
+      html += RECIPES.map((r) => {
+        const out = ITEMS[r.out];
+        const ok = this.g.canCraft(r.id);
+        const needLv = craftLv < r.craftLv;
+        return row(
+          r.icon, r.name, out?.desc || "",
+          this.recipeCost(r),
+          !ok,
+          "craft", r.id,
+          needLv ? `<br><small class="warn">Нужен крафт ур. ${r.craftLv}</small>` : ""
+        );
+      }).join("");
+    } else if (this.tab === "gear") {
+      html = `<p class="shop-note">Надето:</p>`;
+      html += SLOTS.map(({ id, label }) => {
+        const itemId = s.equip[id];
+        const it = itemId ? ITEMS[itemId] : null;
+        return `<div class="gear-slot">
+          <b>${label}:</b> ${it ? `${it.icon} ${it.name} — ${it.desc}` : "пусто"}
+          ${it ? `<button type="button" class="btn-mini" data-unequip="${id}">Снять</button>` : ""}
+        </div>`;
+      }).join("");
+
+      const owned = Object.entries(s.items).filter(([, n]) => n > 0);
+      html += `<p class="shop-note">Рюкзак:</p>`;
+      if (!owned.length) html += `<p class="shop-note">Пусто — крафти на вкладке «Крафт».</p>`;
+      html += owned.map(([id, n]) => {
+        const it = ITEMS[id];
+        if (!it) return "";
+        return row(it.icon, `${it.name} x${n}`, it.desc, "Надеть", false, "equip", id);
+      }).join("");
+
+      html += `<p class="shop-note">Мастерства:</p>`;
+      html += MASTERIES.map((m) => {
+        const prog = masteryLevel(s.masteries[m.id] || 0);
+        const pct = Math.floor((prog.rem / prog.need) * 100);
+        return `<div class="mastery-row">
+          <span>${m.icon} <b>${m.name}</b> ур.${prog.lv}</span>
+          <small>${m.desc}</small>
+          <div class="xp-bar"><div class="xp-fill" style="width:${pct}%"></div></div>
+        </div>`;
+      }).join("");
     } else {
-      html = `<p class="shop-note">Престиж и прочее — для тех, кто уже въехал.</p>`;
+      html = `<p class="shop-note">Престиж и реликвии.</p>`;
       html += RELICS.slice(0, 3).map((r) => {
         const l = this.g.lv(s.relics, r.id);
         return row(r.icon, r.name, r.desc, fmt(cost(r, l)) + "₽", s.coins < cost(r, l), "relics", r.id);
@@ -171,10 +292,34 @@ export class UI {
     this.el["shop-content"].querySelectorAll(".shop-item").forEach((el) => {
       el.onclick = () => {
         if (el.classList.contains("locked")) return;
-        if (this.g.buy(el.dataset.cat, el.dataset.id)) {
+        const cat = el.dataset.cat;
+        const id = el.dataset.id;
+        if (cat === "craft") {
+          if (this.g.craft(id)) {
+            this.toast(`Скрафтил: ${RECIPES.find((x) => x.id === id)?.name}!`);
+            this.renderShop();
+            this.renderMaterials();
+          }
+        } else if (cat === "equip") {
+          if (this.g.equipItem(id)) {
+            this.toast(`Надел: ${ITEMS[id]?.name}`);
+            this.renderShop();
+            this.renderEquipStrip();
+          }
+        } else if (this.g.buy(cat, id)) {
           this.renderShop();
           this.toast("Куплено! Ебашь дальше.");
           this.snd("buy");
+        }
+      };
+    });
+    this.el["shop-content"].querySelectorAll("[data-unequip]").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        if (this.g.unequip(btn.dataset.unequip)) {
+          this.toast("Снял.");
+          this.renderShop();
+          this.renderEquipStrip();
         }
       };
     });
@@ -205,17 +350,16 @@ export class UI {
 
   showHelp() {
     this.el["modal-body"].innerHTML = `
-      <h2>Как играть (коротко)</h2>
+      <h2>Как играть</h2>
       <ol class="help-list">
-        <li><b>Жми по жопе</b> — главное. Бабки капают.</li>
-        <li><b>Жёлтые круги «x3»</b> — жми туда, урон x3.</li>
-        <li><b>Вкладка «Хуй»</b> — качай удар сильнее.</li>
-        <li><b>«Братва»</b> — нанимаешь, они бьют сами.</li>
-        <li><b>Кнопки снизу</b> — скиллы. Жми когда не серые.</li>
-        <li><b>Карта сверху</b> — локации. Убей N олегов → босс → новая зона.</li>
-        <li>Разные олеги выглядят по-разному. Босс — самый жирный.</li>
+        <li><b>Жми по жопе</b> — бабки и опыт ебашки.</li>
+        <li><b>Карта сверху</b> — жми локацию, ходи куда хочешь.</li>
+        <li><b>Кнопки активностей</b> — руби дерево, рыбачь, парься.</li>
+        <li><b>Крафт</b> — собирай ресурсы, делай оружие и броню.</li>
+        <li><b>Шмот</b> — надеваешь, качаешь мастерства.</li>
+        <li><b>Хуй / Братва</b> — классические апгрейды за бабки.</li>
       </ol>
-      <p class="help-note">Не парься с цифрами. Кликай и покупай.</p>
+      <p class="help-note">Сначала собери дерево → дубина → ебашь сильнее.</p>
     `;
     this.el["modal-overlay"].classList.remove("hidden");
   }
@@ -233,6 +377,9 @@ export class UI {
 
     this.applySkin();
     this.renderZoneMap();
+    this.renderMaterials();
+    this.renderEquipStrip();
+    this.renderActivities();
 
     const hp = (s.enemyHp / s.enemyMaxHp) * 100;
     this.el["enemy-hp-fill"].style.width = hp + "%";

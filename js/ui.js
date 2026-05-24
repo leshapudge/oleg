@@ -94,6 +94,20 @@ export class UI {
     this.$("unlock-ok").onclick = () => this.dismissUnlock();
   }
 
+  autoFloat(dmg) {
+    const rect = this.el["oleg-char"]?.getBoundingClientRect();
+    if (!rect) return;
+    const x = rect.left + rect.width * (0.3 + Math.random() * 0.4);
+    const y = rect.top + rect.height * 0.35;
+    const d = document.createElement("div");
+    d.className = "float-dmg auto";
+    d.textContent = `🧔 ${fmt(dmg)}`;
+    d.style.left = x + "px";
+    d.style.top = y + "px";
+    document.getElementById("fx-layer").appendChild(d);
+    setTimeout(() => d.remove(), 600);
+  }
+
   fx(e, { dmg, crit, weak, tired }) {
     playHitAnim(this.el["oleg-char"], crit);
     const x = e.clientX ?? innerWidth / 2;

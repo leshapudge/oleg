@@ -72,6 +72,10 @@ game.on((ev, data) => {
       ui.toast(`✓ ${data.text} (+${data.coins}₽)`);
       if (state.settings.sound) ui.snd("crit");
       break;
+    case "autoHit":
+      if (state.settings.fx) ui.autoFloat(data);
+      ui.updateCombat();
+      break;
     case "counterReady":
     case "parryReady":
       break;

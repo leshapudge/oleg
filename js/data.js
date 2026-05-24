@@ -77,11 +77,11 @@ export const WEAPONS = [
 ];
 
 export const CREW = [
-  { id: "bro", name: "Братан", icon: "🧔", desc: "Сам бьёт слабо", base: 20, mult: 1.11, dps: (l) => l * 0.8 },
-  { id: "gop", name: "Гопник", icon: "🧢", desc: "Пинает нормально", base: 120, mult: 1.13, dps: (l) => l * 3.5 },
-  { id: "it", name: "Айтишник", icon: "💻", desc: "Бьёт + не перегреваешься", base: 600, mult: 1.15, dps: (l) => l * 14, heatRed: (l) => l * 0.02 },
-  { id: "babka", name: "Бабка", icon: "👵", desc: "Охуенный DPS + бабки", base: 3500, mult: 1.17, dps: (l) => l * 55, coin: (l) => 1 + l * 0.025 },
-  { id: "ufo", name: "НЛО", icon: "🛸", desc: "Ебашит из космоса", base: 25000, mult: 1.2, dps: (l) => l * 280 },
+  { id: "bro", name: "Братан", icon: "🧔", desc: "Сам бьёт слабо", base: 20, mult: 1.11, dps: (l) => 2 + l * 1.5 },
+  { id: "gop", name: "Гопник", icon: "🧢", desc: "Пинает нормально", base: 120, mult: 1.13, dps: (l) => 6 + l * 4 },
+  { id: "it", name: "Айтишник", icon: "💻", desc: "Бьёт + не перегреваешься", base: 600, mult: 1.15, dps: (l) => 15 + l * 16, heatRed: (l) => l * 0.02 },
+  { id: "babka", name: "Бабка", icon: "👵", desc: "Охуенный DPS + бабки", base: 3500, mult: 1.17, dps: (l) => 40 + l * 60, coin: (l) => 1 + l * 0.025 },
+  { id: "ufo", name: "НЛО", icon: "🛸", desc: "Ебашит из космоса", base: 25000, mult: 1.2, dps: (l) => 120 + l * 300 },
 ];
 
 export const ELEMENT_UPGRADES = [

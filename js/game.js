@@ -31,6 +31,7 @@ export class Game {
     this.olegRage = 0;
     this.heavyCd = 0;
     this._counterPending = false;
+    this._autoPool = 0;
     this.pickChallenge();
     this.pickMutator();
   }
@@ -335,6 +336,7 @@ export class Game {
     this.state.damage += dmg;
 
     if (this.state.enemyHp <= 0) this.killEnemy();
+    if (src === "auto" && dmg >= 1) this.emit("autoHit", dmg);
     this.emit("hit", { dmg, src, ...opts });
     return dmg;
   }
@@ -623,7 +625,7 @@ export class Game {
       coins: this.hasTalent("t3") ? 800 : 0,
     });
     this.combo = 0; this.rage = 0; this.overdrive = 0; this.heat = 0;
-    this.stamina = 100; this.olegRage = 0; this.heavyCd = 0;
+    this.stamina = 100; this.olegRage = 0; this.heavyCd = 0; this._autoPool = 0;
     this.killStreak = 0;
     this.spawnEnemy();
     this.emit("prestige", g);
@@ -664,7 +666,14 @@ export class Game {
     if (this.heavyCd > 0) this.heavyCd = Math.max(0, this.heavyCd - sec);
 
     const dps = this.autoDps();
-    if (dps >= 1) this.dealDamage(Math.floor(dps * sec), "auto");
+    if (dps > 0) {
+      this._autoPool += dps * sec;
+      if (this._autoPool >= 1) {
+        const dmg = Math.floor(this._autoPool);
+        this._autoPool -= dmg;
+        this.dealDamage(dmg, "auto");
+      }
+    }
 
     if (this.state.buffs.frenzy) {
       for (let i = 0; i < 6 * sec; i++) {

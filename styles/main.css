@@ -965,6 +965,7 @@ body {
 
 .float-dmg.crit { font-size: 1.5rem; color: var(--accent2); }
 .float-dmg.weak { color: var(--red); }
+.float-dmg.auto { font-size: 0.85rem; color: var(--blue); opacity: 0.85; }
 
 @keyframes floatUp {
   to { opacity: 0; transform: translateY(-50px) scale(1.08); }

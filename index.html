@@ -3,140 +3,169 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Олег Симулятор — Кликер RPG</title>
+  <title>ОЛЕГБОЙ — аркадный кликер</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles/main.css" />
 </head>
 <body>
-  <div id="particles"></div>
-  <div class="app">
-    <header class="top-bar">
-      <div class="logo">
-        <span class="logo-icon">🍑</span>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div id="fx-layer"></div>
+
+  <div class="game-shell">
+    <header class="hud-top">
+      <div class="brand">
+        <span class="brand-mark">OB</span>
         <div>
-          <h1>Олег Симулятор</h1>
-          <p class="subtitle">Кликер RPG v2.0</p>
+          <h1>ОЛЕГБОЙ</h1>
+          <p id="zone-label">Двор · Волна 1</p>
         </div>
       </div>
-      <div class="resources">
-        <div class="res" title="Монеты">
-          <span class="res-icon">🪙</span>
-          <span id="coins">0</span>
+
+      <div class="currencies">
+        <div class="cur"><span class="cur-lbl">₽</span><span id="coins">0</span></div>
+        <div class="cur"><span class="cur-lbl">★</span><span id="prestige">0</span></div>
+        <div class="cur"><span class="cur-lbl">◆</span><span id="souls">0</span></div>
+        <div class="cur"><span class="cur-lbl">⚗</span><span id="essence">0</span></div>
+      </div>
+
+      <div class="meters-row">
+        <div class="meter rage-meter" title="Ярость">
+          <label>ЯРОСТЬ</label>
+          <div class="bar"><div class="fill rage" id="rage-fill"></div></div>
+          <span id="rage-val">0%</span>
         </div>
-        <div class="res" title="Очки престижа">
-          <span class="res-icon">⭐</span>
-          <span id="prestige">0</span>
+        <div class="meter over-meter" title="Овердрайв">
+          <label>ОВЕРДРАЙВ</label>
+          <div class="bar"><div class="fill over" id="over-fill"></div></div>
+          <span id="over-val">0%</span>
         </div>
-        <div class="res" title="Души Олега">
-          <span class="res-icon">👻</span>
-          <span id="souls">0</span>
+        <div class="meter heat-meter" title="Перегрев">
+          <label>ЖАР</label>
+          <div class="bar"><div class="fill heat" id="heat-fill"></div></div>
+          <span id="heat-val">0%</span>
         </div>
       </div>
-      <div class="top-actions">
-        <button class="btn-icon" id="btn-stats" title="Статистика">📊</button>
-        <button class="btn-icon" id="btn-achievements" title="Достижения">🏆</button>
-        <button class="btn-icon" id="btn-settings" title="Настройки">⚙️</button>
+
+      <div class="hud-actions">
+        <button class="hud-btn" id="btn-map" title="Карта">🗺</button>
+        <button class="hud-btn" id="btn-challenges" title="Челленджи">🎯</button>
+        <button class="hud-btn" id="btn-achievements" title="Достижения">🏆</button>
+        <button class="hud-btn" id="btn-settings" title="Настройки">⚙</button>
       </div>
     </header>
 
-    <main class="game-layout">
-      <aside class="panel left-panel">
-        <section class="card level-card">
-          <h3>Уровень игрока</h3>
-          <div class="level-num"><span id="player-level">1</span></div>
-          <div class="xp-bar">
-            <div class="xp-fill" id="xp-fill"></div>
-          </div>
-          <p class="xp-text"><span id="xp-current">0</span> / <span id="xp-max">100</span> XP</p>
+    <main class="arena-grid">
+      <aside class="col-left">
+        <section class="panel">
+          <h2>Стрик</h2>
+          <div class="streak-num" id="kill-streak">0</div>
+          <p class="muted">x<span id="streak-mult">1.0</span> к награде</p>
         </section>
 
-        <section class="card wave-card">
-          <h3>Волна <span id="wave-num">1</span></h3>
-          <p class="wave-name" id="wave-name">Двор Олега</p>
-          <div class="boss-timer hidden" id="boss-timer-wrap">
-            ⏱ Босс: <span id="boss-timer">30</span>с
-          </div>
+        <section class="panel">
+          <h2>Мутатор волны</h2>
+          <p class="mutator-text" id="mutator-text">—</p>
         </section>
 
-        <section class="card stats-card">
-          <h3>Боевые статы</h3>
-          <ul class="stat-list" id="stat-list"></ul>
+        <section class="panel">
+          <h2>Артефакты</h2>
+          <div class="artifact-slots" id="artifact-slots"></div>
         </section>
 
-        <section class="card combo-card">
-          <h3>Комбо</h3>
-          <div class="combo-meter">
-            <div class="combo-fill" id="combo-fill"></div>
-          </div>
-          <p>x<span id="combo-mult">1.0</span> (<span id="combo-count">0</span> ударов)</p>
+        <section class="panel">
+          <h2>Активные бафы</h2>
+          <ul class="buff-list" id="buff-list"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Инвентарь</h2>
+          <div class="consumables" id="consumables"></div>
         </section>
       </aside>
 
-      <section class="arena">
-        <div class="arena-info">
-          <span class="tag" id="enemy-tag">Обычный</span>
+      <section class="col-center">
+        <div class="fight-header">
+          <div class="enemy-badge" id="enemy-badge">ОБЫЧНЫЙ</div>
           <h2 id="enemy-name">Олег</h2>
+          <div class="phase-dots" id="phase-dots"></div>
         </div>
 
-        <div class="hp-wrap enemy-hp">
-          <div class="hp-label">
-            <span>HP Олега</span>
-            <span id="enemy-hp-text">100 / 100</span>
-          </div>
-          <div class="hp-bar">
-            <div class="hp-fill enemy" id="enemy-hp-fill"></div>
+        <div class="hp-block boss-hp-block hidden" id="boss-hp-block">
+          <div class="hp-meta"><span>Босс</span><span id="boss-timer">30</span>с</div>
+          <div class="hp-bar lg"><div class="hp-fill boss" id="boss-hp-fill"></div></div>
+        </div>
+
+        <div class="hp-block">
+          <div class="hp-meta"><span>HP</span><span id="enemy-hp-text">100 / 100</span></div>
+          <div class="hp-bar lg"><div class="hp-fill" id="enemy-hp-fill"></div></div>
+          <div class="shield-bar hidden" id="shield-wrap">
+            <div class="shield-fill" id="shield-fill"></div>
           </div>
         </div>
 
-        <button class="olleg-target" id="click-target" type="button" aria-label="Ударить Олега">
-          <div class="olleg-sprite" id="olleg-sprite">
-            <div class="olleg-head">🧑</div>
-            <div class="olleg-body"></div>
-            <div class="olleg-butt" id="hit-zone">🍑</div>
-            <div class="impact-ring"></div>
-          </div>
-          <p class="tap-hint">Жми по жопе!</p>
-        </button>
+        <div class="arena-stage" id="arena-stage">
+          <div class="weak-spot left" id="weak-left" data-side="left">x3</div>
+          <button class="oleg-target" id="click-target" type="button">
+            <div class="oleg-char" id="oleg-char">
+              <div class="oleg-torso"></div>
+              <div class="oleg-head"><span class="oleg-face"></span></div>
+              <div class="oleg-glutes" id="hit-zone"></div>
+              <div class="hit-flash"></div>
+            </div>
+          </button>
+          <div class="weak-spot right" id="weak-right" data-side="right">x3</div>
+          <div class="parry-prompt hidden" id="parry-prompt">БЛОК!</div>
+        </div>
 
-        <div class="skills-bar" id="skills-bar"></div>
+        <div class="combo-strip">
+          <span>КОМБО</span>
+          <div class="combo-bar"><div class="combo-fill" id="combo-fill"></div></div>
+          <span id="combo-mult">x1.0</span>
+          <span class="combo-count" id="combo-count">0</span>
+        </div>
 
-        <div class="dps-line">
-          <span>Урон/клик: <strong id="dpc-display">1</strong></span>
-          <span>Авто-DPS: <strong id="dps-display">0</strong></span>
-          <span>Крит: <strong id="crit-display">5%</strong></span>
+        <div class="skills-dock" id="skills-dock"></div>
+
+        <div class="combat-stats">
+          <span>УДАР <b id="dpc-display">1</b></span>
+          <span>DPS <b id="dps-display">0</b></span>
+          <span>КРИТ <b id="crit-display">5%</b></span>
+          <span>ЭЛЕМ. <b id="element-display">—</b></span>
         </div>
       </section>
 
-      <aside class="panel right-panel">
+      <aside class="col-right">
+        <div class="level-strip">
+          <span>УР. <strong id="player-level">1</strong></span>
+          <div class="xp-bar"><div class="xp-fill" id="xp-fill"></div></div>
+          <span class="xp-txt"><span id="xp-current">0</span>/<span id="xp-max">100</span></span>
+        </div>
+
         <nav class="shop-tabs" id="shop-tabs">
-          <button class="tab active" data-tab="weapon">🗡 Хуй</button>
-          <button class="tab" data-tab="helpers">👥 Помощники</button>
-          <button class="tab" data-tab="skills">✨ Навыки</button>
-          <button class="tab" data-tab="relics">💎 Реликвии</button>
-          <button class="tab" data-tab="prestige">⭐ Престиж</button>
+          <button class="tab active" data-tab="weapon">Оружие</button>
+          <button class="tab" data-tab="crew">Команда</button>
+          <button class="tab" data-tab="elements">Стихии</button>
+          <button class="tab" data-tab="relics">Реликвии</button>
+          <button class="tab" data-tab="research">Наука</button>
+          <button class="tab" data-tab="prestige">Престиж</button>
         </nav>
-        <div class="shop-content card" id="shop-content"></div>
+        <div class="shop-scroll" id="shop-content"></div>
       </aside>
     </main>
 
-    <footer class="bottom-bar">
-      <div class="event-banner hidden" id="event-banner"></div>
-      <p id="footer-tip">Совет: держи комбо — множитель урона растёт!</p>
-      <button class="btn-prestige-small hidden" id="btn-prestige-quick">Престиж доступен!</button>
+    <footer class="hud-bottom">
+      <div class="event-ticker" id="event-ticker">Добро пожаловать в ОЛЕГБОЙ</div>
+      <div class="challenge-bar" id="challenge-bar"></div>
+      <div class="map-strip" id="map-strip"></div>
     </footer>
   </div>
 
-  <!-- Modals -->
   <div class="modal-overlay hidden" id="modal-overlay">
-    <div class="modal" id="modal">
-      <button class="modal-close" id="modal-close">×</button>
-      <div id="modal-body"></div>
-    </div>
+    <div class="modal"><button class="modal-x" id="modal-close">×</button><div id="modal-body"></div></div>
   </div>
-
-  <div class="toast-container" id="toasts"></div>
+  <div class="toast-stack" id="toasts"></div>
 
   <script type="module" src="js/main.js"></script>
 </body>

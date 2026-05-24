@@ -1,447 +1,636 @@
 import {
-  WAVES,
-  ENEMY_TYPES,
-  WEAPON_UPGRADES,
-  HELPERS,
-  RELICS,
-  TALENTS,
-  upgradeCost,
+  ZONES, ENEMY_TYPES, ELEMENTS, MUTATORS, WEAPONS, CREW,
+  ELEMENT_UPGRADES, RELICS, RESEARCH, SKILLS, ARTIFACTS,
+  CONSUMABLES, CHALLENGES, TALENTS, EVENTS, cost,
 } from "./data.js";
 
-export class GameEngine {
+export class Game {
   constructor(state) {
     this.state = state;
     this.combo = 0;
-    this.comboTimer = 0;
-    this.lastTick = performance.now();
-    this.onEnemyDeath = null;
-    this.onAchievement = null;
+    this.comboT = 0;
+    this.rage = 0;
+    this.overdrive = 0;
+    this.heat = 0;
+    this.killStreak = 0;
+    this.streakT = 0;
+    this.weakSpot = null;
+    this.weakT = 0;
+    this.parryActive = false;
+    this.parryT = 0;
+    this.parryWindow = 0;
     this.listeners = new Set();
+    this._crewCoin = 1;
+    this._eventTick = 0;
+    this._weakSide = "left";
+    this.pickChallenge();
+    this.pickMutator();
   }
 
-  subscribe(fn) {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+  on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  emit(ev, data) { this.listeners.forEach((f) => f(ev, data)); }
+
+  lv(map, id) { return map[id] || 0; }
+
+  zone() {
+    const z = ZONES[Math.min(this.state.zoneIdx, ZONES.length - 1)];
+    const loop = Math.floor(this.state.wave / ZONES.length);
+    return { ...z, loopMult: 1 + loop * 0.45 };
   }
 
-  emit(event, data) {
-    this.listeners.forEach((fn) => fn(event, data));
-  }
+  hasTalent(id) { return this.state.talents.includes(id); }
 
-  getWaveData() {
-    const idx = Math.min(this.state.wave - 1, WAVES.length - 1);
-    const loop = Math.floor((this.state.wave - 1) / WAVES.length);
-    const base = WAVES[idx];
-    const loopMult = 1 + loop * 0.5;
-    return { ...base, loopMult };
-  }
-
-  getUpgradeLevel(map, id) {
-    return map[id] || 0;
-  }
-
-  getComboWindow() {
-    const lubeLv = this.getUpgradeLevel(this.state.weaponLevels, "lube");
-    const lube = WEAPON_UPGRADES.find((u) => u.id === "lube");
-    let window = lube ? lube.effect(lubeLv) : 2000;
-    if (this.hasTalent("t_combo")) window += 500;
-    return window;
-  }
-
-  getComboMult() {
-    return 1 + Math.min(this.combo, 100) * 0.02;
-  }
-
-  hasTalent(id) {
-    return this.state.talents.includes(id);
-  }
-
-  getTalentMult(type) {
+  talentMult(type) {
     let m = 1;
     for (const t of TALENTS) {
-      if (this.state.talents.includes(t.id) && t.effect === type) m += t.value;
+      if (!this.state.talents.includes(t.id)) continue;
+      if (t.fx === type) m += t.v;
     }
     return m;
   }
 
-  getPrestigeMult() {
-    return 1 + this.state.prestigePoints * 0.05 + this.state.prestigeCount * 0.02;
+  researchMult(id) {
+    const r = RESEARCH.find((x) => x.id === id);
+    if (!r) return 1;
+    return r.fx(this.lv(this.state.research, id));
   }
 
-  getRelicMult(type) {
+  relicMult(kind) {
     let m = 1;
     for (const r of RELICS) {
-      const lv = this.getUpgradeLevel(this.state.relicLevels, r.id);
-      if (lv === 0) continue;
-      if (type === "damage" && r.id === "ring") m *= r.mult(lv);
-      if (type === "auto" && r.id === "boots") m *= r.mult(lv);
-      if (type === "coins" && r.id === "amulet") m *= r.mult(lv);
-      if (type === "xp" && r.id === "crown") m *= r.mult(lv);
+      const l = this.lv(this.state.relics, r.id);
+      if (!l) continue;
+      if (kind === "dmg" && r.id === "ring") m *= r.fx(l);
+      if (kind === "dps" && r.id === "boots") m *= r.fx(l);
+      if (kind === "coin" && r.id === "bag") m *= r.fx(l);
+      if (kind === "xp" && r.id === "brain") m *= r.fx(l);
     }
     return m;
   }
 
-  getBaseClickDamage() {
-    const sizeLv = this.getUpgradeLevel(this.state.weaponLevels, "size");
-    const size = WEAPON_UPGRADES.find((u) => u.id === "size");
-    let dmg = size ? size.effect(sizeLv) : 1;
+  artifactMult() {
+    let dmg = 1, coin = 1, crit = 0;
+    for (const id of this.state.artifacts) {
+      if (!id) continue;
+      const a = ARTIFACTS.find((x) => x.id === id);
+      if (!a) continue;
+      if (a.dmg) dmg *= a.dmg;
+      if (a.coin) coin *= a.coin;
+      if (a.crit) crit += a.crit;
+      if (a.all) { dmg *= a.all; coin *= a.all; }
+    }
+    return { dmg, coin, crit };
+  }
 
-    const hardLv = this.getUpgradeLevel(this.state.weaponLevels, "hardness");
-    const hard = WEAPON_UPGRADES.find((u) => u.id === "hardness");
-    const hardMult = hard ? hard.effect(hardLv) : 1;
+  prestigeMult() {
+    return 1 + this.state.prestigePts * 0.06 + this.state.prestigeCount * 0.025;
+  }
 
-    dmg *= hardMult;
-    dmg *= this.getComboMult();
-    dmg *= this.getPrestigeMult();
-    dmg *= this.getRelicMult("damage");
-    dmg *= this.getTalentMult("damage");
+  comboWindow() {
+    const w = WEAPONS.find((x) => x.id === "speed");
+    let ms = w ? w.fx(this.lv(this.state.weapons, "speed")) : 1800;
+    if (this.hasTalent("t4")) ms += 400;
+    if (this.state.event?.combo) ms *= this.state.event.combo;
+    return ms;
+  }
 
-    if (this.state.buffs.mega_slap) dmg *= 10;
-    if (this.state.event === "free_damage") dmg *= 1.5;
-    if (this.state.event === "lucky_crit" && Math.random() < 0.3) dmg *= 2;
+  comboMult() {
+    const base = 1 + Math.min(this.combo, 120) * 0.018;
+    const rageBonus = this.rage >= 100 ? 1.5 : 1 + this.rage / 200;
+    return base * rageBonus;
+  }
+
+  streakMult() {
+    return 1 + Math.min(this.killStreak, 50) * 0.04;
+  }
+
+  clickDamage() {
+    const baseW = WEAPONS.find((x) => x.id === "base");
+    let dmg = baseW ? baseW.fx(this.lv(this.state.weapons, "base")) : 2;
+
+    const weight = WEAPONS.find((x) => x.id === "weight");
+    dmg *= weight ? weight.fx(this.lv(this.state.weapons, "weight")) : 1;
+
+    dmg *= this.comboMult();
+    dmg *= this.prestigeMult();
+    dmg *= this.relicMult("dmg");
+    dmg *= this.researchMult("r_dmg");
+    dmg *= this.talentMult("dmg");
+    dmg *= this.artifactMult().dmg;
+
+    if (this.overdrive >= 100) dmg *= 2.5;
+    if (this.state.buffs.slap) dmg *= 8;
+    if (this.state.buffs.oil) dmg *= 2;
+    if (this.state.event?.dmg) dmg *= this.state.event.dmg;
+
+    dmg *= this.getElementBonus();
 
     return Math.max(1, Math.floor(dmg));
   }
 
-  getCritChance() {
-    const lv = this.getUpgradeLevel(this.state.weaponLevels, "crit_chance");
-    const u = WEAPON_UPGRADES.find((x) => x.id === "crit_chance");
-    const max = u?.max ?? 99;
-    return Math.min(max / 100, u ? u.effect(lv) : 0.05);
+  getElementBonus() {
+    const el = this.state.enemyElement;
+    if (el === "none") return 1;
+    let bonus = 1;
+    const fire = this.lv(this.state.elements, "fire");
+    const ice = this.lv(this.state.elements, "ice");
+    const shock = this.lv(this.state.elements, "shock");
+    const sync = ELEMENT_UPGRADES.find((x) => x.id === "sync");
+    const syncM = sync ? sync.fx(this.lv(this.state.elements, "sync")) : 1;
+
+    if (el === "ice" && fire) bonus += fire * 0.08;
+    if (el === "fire" && ice) bonus += ice * 0.08;
+    if (el === "shock" && fire) bonus += shock * 0.06;
+
+    const weak = ELEMENTS[el]?.weak;
+    if (weak === "fire" && fire > 0) bonus *= syncM;
+    if (weak === "ice" && ice > 0) bonus *= syncM;
+
+    return bonus;
   }
 
-  getCritMult() {
-    const lv = this.getUpgradeLevel(this.state.weaponLevels, "crit_mult");
-    const u = WEAPON_UPGRADES.find((x) => x.id === "crit_mult");
-    return u ? u.effect(lv) : 2;
+  critChance() {
+    const c = WEAPONS.find((x) => x.id === "crit");
+    let ch = c ? c.fx(this.lv(this.state.weapons, "crit")) : 0.05;
+    ch += this.artifactMult().crit;
+    if (this.state.event?.crit) ch += this.state.event.crit;
+    return Math.min(0.75, ch);
   }
 
-  getDoubleTapChance() {
-    const lv = this.getUpgradeLevel(this.state.weaponLevels, "double_tap");
-    const u = WEAPON_UPGRADES.find((x) => x.id === "double_tap");
-    const max = u?.max ?? 99;
-    return Math.min(max / 100, u ? u.effect(lv) : 0);
+  critMult() {
+    const c = WEAPONS.find((x) => x.id === "critd");
+    return c ? c.fx(this.lv(this.state.weapons, "critd")) : 2;
   }
 
-  getAutoDps() {
+  doubleChance() {
+    const c = WEAPONS.find((x) => x.id === "chain");
+    return c ? Math.min(0.6, c.fx(this.lv(this.state.weapons, "chain"))) : 0;
+  }
+
+  autoDps() {
     let dps = 0;
-    let coinMult = 1;
-    for (const h of HELPERS) {
-      const lv = this.getUpgradeLevel(this.state.helperLevels, h.id);
-      if (lv > 0) {
-        dps += h.dps(lv);
-        if (h.coinBonus) coinMult *= h.coinBonus(lv);
-      }
+    this._crewCoin = 1;
+    for (const c of CREW) {
+      const l = this.lv(this.state.crew, c.id);
+      if (!l) continue;
+      dps += c.dps(l);
+      if (c.coin) this._crewCoin *= c.coin(l);
     }
-    dps *= this.getPrestigeMult();
-    dps *= this.getRelicMult("damage");
-    dps *= this.getRelicMult("auto");
-    dps *= this.getTalentMult("auto");
-
-    const hardLv = this.getUpgradeLevel(this.state.weaponLevels, "hardness");
-    const hard = WEAPON_UPGRADES.find((u) => u.id === "hardness");
-    dps *= hard ? hard.effect(hardLv) : 1;
-
-    if (this.state.buffs.mega_slap) dps *= 10;
-
-    this._helperCoinMult = coinMult;
+    const weight = WEAPONS.find((x) => x.id === "weight");
+    dps *= weight ? weight.fx(this.lv(this.state.weapons, "weight")) : 1;
+    dps *= this.prestigeMult();
+    dps *= this.relicMult("dmg");
+    dps *= this.relicMult("dps");
+    dps *= this.researchMult("r_dmg");
+    dps *= this.talentMult("dps");
+    dps *= this.artifactMult().dmg;
+    if (this.state.buffs.slap) dps *= 8;
+    if (this.state.event?.dmg) dps *= this.state.event.dmg;
     return dps;
   }
 
-  rollDamage(isClick = true) {
-    let dmg = isClick ? this.getBaseClickDamage() : this.getAutoDps();
+  rollHit(isClick = true) {
+    let dmg = isClick ? this.clickDamage() : this.autoDps();
     let crit = false;
-    if (Math.random() < this.getCritChance()) {
+    let weak = false;
+
+    if (Math.random() < this.critChance()) {
       crit = true;
-      dmg = Math.floor(dmg * this.getCritMult());
-      this.state.totalCrits++;
+      dmg = Math.floor(dmg * this.critMult());
+      this.state.crits++;
     }
-    if (isClick && Math.random() < this.getDoubleTapChance()) {
-      dmg *= 2;
-    }
-    return { dmg: Math.max(1, Math.floor(dmg)), crit };
+    if (isClick && Math.random() < this.doubleChance()) dmg *= 2;
+
+    return { dmg: Math.max(1, Math.floor(dmg)), crit, weak };
+  }
+
+  pickMutator() {
+    this.state.mutator = MUTATORS[Math.floor(Math.random() * MUTATORS.length)];
+  }
+
+  pickChallenge() {
+    const c = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
+    this.state.challenge = c.id;
+    this.state.challengeProg = { weakHits: 0, parry: false };
+    this.state.weakHits = 0;
+    this.state.parryDone = false;
   }
 
   spawnEnemy() {
-    const wave = this.getWaveData();
-    const loopMult = wave.loopMult;
+    const z = this.zone();
     let type = "normal";
+    const k = this.state.killsInWave;
 
-    if (this.state.killsOnWave > 0 && this.state.killsOnWave % 10 === 0) {
-      type = "boss";
-      this.state.bossTimer = 30;
-    } else if (this.state.killsOnWave > 0 && this.state.killsOnWave % 5 === 0) {
-      type = "elite";
-    }
+    if (k > 0 && k % 12 === 0) { type = "boss"; this.state.bossTimer = 35; this.state.bossPhase = 1; }
+    else if (k > 0 && k % 7 === 0) type = "mini";
+    else if (k > 0 && k % 4 === 0) type = "elite";
 
     const et = ENEMY_TYPES[type];
-    const baseHp = 50 * Math.pow(1.12, this.state.wave) * wave.hpMult * loopMult;
-    const hp = Math.floor(baseHp * et.hpMult);
+    let hp = 45 * Math.pow(1.11, this.state.wave) * z.hp * z.loopMult * et.hp;
 
+    if (this.state.mutator?.id === "armored") hp *= 1.5;
+    if (this.state.mutator?.id === "greedy") hp *= 1.3;
+    if (this.state.mutator?.id === "thin") hp *= 0.7;
+
+    const els = ["fire", "ice", "shock"];
+    this.state.enemyElement = type === "normal" ? "none" : els[Math.floor(Math.random() * els.length)];
     this.state.enemyType = type;
-    this.state.enemyMaxHp = hp;
-    this.state.enemyHp = hp;
-    this.emit("enemySpawn", { type, hp });
+    this.state.enemyMaxHp = Math.floor(hp);
+    this.state.enemyHp = this.state.enemyMaxHp;
+    this.state.enemyShield = this.state.mutator?.id === "armored" ? Math.floor(hp * 0.25) : 0;
+
+    this.spawnWeakSpot();
+    this.emit("spawn", { type });
   }
 
-  dealDamage(amount, source = "click") {
-    this.state.enemyHp = Math.max(0, this.state.enemyHp - amount);
-    this.state.totalDamage += amount;
+  spawnWeakSpot() {
+    this.weakSpot = this._weakSide;
+    this._weakSide = this._weakSide === "left" ? "right" : "left";
+    this.weakT = 2500 + Math.random() * 1500;
+  }
 
-    if (this.state.enemyHp <= 0) {
-      this.killEnemy();
+  dealDamage(amount, src = "click", opts = {}) {
+    let dmg = amount;
+    const pierce = WEAPONS.find((x) => x.id === "pierce");
+    const piercePct = pierce ? pierce.fx(this.lv(this.state.weapons, "pierce")) : 0;
+
+    if (this.state.enemyShield > 0) {
+      const toShield = Math.floor(dmg * (1 - piercePct));
+      this.state.enemyShield = Math.max(0, this.state.enemyShield - toShield);
+      dmg = Math.floor(dmg * piercePct) + Math.max(0, dmg - toShield);
     }
-    this.emit("damage", { amount, source });
+
+    if (opts.weak) dmg = Math.floor(dmg * 3);
+
+    this.state.enemyHp = Math.max(0, this.state.enemyHp - dmg);
+    this.state.damage += dmg;
+
+    if (this.state.enemyHp <= 0) this.killEnemy();
+    this.emit("hit", { dmg, src, ...opts });
+    return dmg;
   }
 
   killEnemy() {
     const et = ENEMY_TYPES[this.state.enemyType];
-    const wave = this.getWaveData();
-    let coins = 10 * this.state.wave * et.coinMult * wave.coinMult;
+    const z = this.zone();
+    let coins = 12 * this.state.wave * et.coins * z.coins;
 
-    coins *= this.getRelicMult("coins");
-    coins *= this._helperCoinMult || 1;
-    coins *= this.getTalentMult("coins");
-    if (this.state.buffs.gold_rain) coins *= 5;
-    if (this.state.event === "double_coins") coins *= 2;
+    coins *= this.relicMult("coin");
+    coins *= this._crewCoin;
+    coins *= this.talentMult("coin");
+    coins *= this.artifactMult().coin;
+    coins *= this.streakMult();
+    if (this.state.buffs.gold) coins *= 4;
+    if (this.state.buffs.magnet) coins *= 3;
+    if (this.state.event?.coin) coins *= this.state.event.coin;
+    if (this.state.mutator?.id === "greedy") coins *= 2;
 
     coins = Math.floor(coins);
     this.state.coins += coins;
-    this.state.totalCoinsEarned += coins;
+    this.state.coinsEarned += coins;
 
-    const xp = Math.floor(15 * this.state.wave * et.xpMult * this.getRelicMult("xp"));
+    let xp = Math.floor(12 * this.state.wave * et.xp * this.relicMult("xp"));
     this.gainXp(xp);
+
+    let ess = Math.floor(1 + this.state.wave / 5);
+    if (et.tag === "БОСС") ess *= 3;
+    ess = Math.floor(ess * this.talentMult("essence"));
+    this.state.essence += ess;
 
     if (this.state.enemyType === "boss") {
       this.state.bossKills++;
-      this.state.bossTimer = 0;
+      this.tryDropArtifact();
     }
 
-    this.state.killsOnWave++;
-    if (this.state.killsOnWave >= 15) {
+    this.killStreak++;
+    this.streakT = 8000;
+
+    this.state.killsInWave++;
+    if (this.state.killsInWave >= 14) {
       this.state.wave++;
-      this.state.killsOnWave = 0;
-      this.emit("waveUp", this.state.wave);
+      this.state.killsInWave = 0;
+      if (this.state.wave % ZONES.length === 1) {
+        this.state.zoneIdx = Math.min(this.state.zoneIdx + 1, ZONES.length - 1);
+        if (!this.state.unlockedZones.includes(this.state.zoneIdx))
+          this.state.unlockedZones.push(this.state.zoneIdx);
+      }
+      this.pickMutator();
+      this.emit("wave", this.state.wave);
     }
 
-    this.onEnemyDeath?.(coins);
+    this.tryLoot();
+    this.checkChallenge();
     this.spawnEnemy();
-    this.emit("kill", { coins, xp });
+    this.emit("kill", { coins, ess });
   }
 
-  gainXp(amount) {
-    this.state.playerXp += amount;
-    const need = this.xpForLevel(this.state.playerLevel);
-    while (this.state.playerXp >= need) {
-      this.state.playerXp -= need;
-      this.state.playerLevel++;
-      this.emit("levelUp", this.state.playerLevel);
+  tryLoot() {
+    let chance = 0.08 * this.researchMult("r_loot");
+    if (this.state.mutator?.id === "lucky") chance *= 2;
+    if (this.state.event?.loot) chance *= this.state.event.loot;
+    if (this.hasTalent("t7")) chance += 0.05;
+    if (Math.random() > chance) return;
+
+    const keys = Object.keys(CONSUMABLES);
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    this.state.inventory[key] = (this.state.inventory[key] || 0) + 1;
+    this.emit("loot", key);
+  }
+
+  tryDropArtifact() {
+    if (Math.random() > 0.35) return;
+    const empty = this.state.artifacts.findIndex((a) => !a);
+    if (empty < 0) return;
+    const pool = ARTIFACTS.filter((a) => !this.state.artifacts.includes(a.id));
+    if (!pool.length) return;
+    const art = pool[Math.floor(Math.random() * pool.length)];
+    this.state.artifacts[empty] = art.id;
+    this.emit("artifact", art);
+  }
+
+  gainXp(n) {
+    this.state.xp += n;
+    while (this.state.xp >= this.xpNeed()) {
+      this.state.xp -= this.xpNeed();
+      this.state.level++;
+      this.emit("level", this.state.level);
     }
   }
 
-  xpForLevel(lv) {
-    return Math.floor(100 * Math.pow(1.15, lv - 1));
-  }
+  xpNeed() { return Math.floor(90 * Math.pow(1.14, this.state.level - 1)); }
 
-  click() {
-    this.state.totalClicks++;
+  click(side = null) {
+    this.state.clicks++;
     this.combo++;
-    this.comboTimer = this.getComboWindow();
+    this.comboT = this.comboWindow();
     if (this.combo > this.state.maxCombo) this.state.maxCombo = this.combo;
 
-    const { dmg, crit } = this.rollDamage(true);
-    this.dealDamage(dmg, "click");
-    return { dmg, crit };
+    const heatGain = 4 - (this.lv(this.state.crew, "it") * 0.15);
+    this.heat = Math.min(100, this.heat + Math.max(1, heatGain));
+    const overGain = (8 + this.combo * 0.05) * this.researchMult("r_over");
+    this.overdrive = Math.min(100, this.overdrive + overGain);
+    this.rage = Math.min(100, this.rage + 3 * this.researchMult("r_rage"));
+
+    if (this.rage >= 100) this.state.rageMaxed = (this.state.rageMaxed || 0) + 1;
+
+    const isWeak = side && this.weakSpot === side && this.weakT > 0;
+    if (isWeak) {
+      this.state.weakHits++;
+      this.weakT = 0;
+      this.spawnWeakSpot();
+    }
+
+    let { dmg, crit } = this.rollHit(true);
+    if (this.heat >= 100) dmg = Math.floor(dmg * 0.5);
+
+    dmg = this.dealDamage(dmg, "click", { crit, weak: isWeak });
+    return { dmg, crit, weak: isWeak };
   }
 
-  buyUpgrade(category, id) {
-    let list, map;
-    if (category === "weapon") {
-      list = WEAPON_UPGRADES;
-      map = this.state.weaponLevels;
-    } else if (category === "helpers") {
-      list = HELPERS;
-      map = this.state.helperLevels;
-    } else if (category === "relics") {
-      list = RELICS;
-      map = this.state.relicLevels;
-    } else return false;
+  weakClick(side) { return this.click(side); }
 
+  parry() {
+    if (!this.parryActive) return false;
+    this.parryActive = false;
+    this.state.parryDone = true;
+    this.rage = Math.min(100, this.rage + 25);
+    this.overdrive = Math.min(100, this.overdrive + 30);
+    const dmg = Math.floor(this.state.enemyMaxHp * 0.08);
+    this.dealDamage(dmg, "parry", { crit: true });
+    this.emit("parry");
+    return true;
+  }
+
+  useSkill(id) {
+    const s = SKILLS.find((x) => x.id === id);
+    if (!s || (this.state.skillCd[id] || 0) > 0) return false;
+    this.state.skillCd[id] = s.cd;
+    if (id === "nuke") {
+      const dmg = Math.floor(this.state.enemyMaxHp * 0.3);
+      this.dealDamage(dmg, "nuke", { crit: true });
+    } else if (id === "rage") {
+      this.rage = 100;
+    } else if (s.dur > 0) {
+      this.state.buffs[id] = s.dur;
+    }
+    this.emit("skill", id);
+    return true;
+  }
+
+  useConsumable(key) {
+    const n = this.state.inventory[key] || 0;
+    if (!n) return false;
+    const c = CONSUMABLES[key];
+    this.state.inventory[key] = n - 1;
+
+    if (c.effect === "bomb") this.dealDamage(Math.floor(this.state.enemyMaxHp * 0.15), "bomb");
+    if (c.effect === "oil") this.state.buffs.oil = 8;
+    if (c.effect === "magnet") this.state.buffs.magnet = 10;
+    if (c.effect === "cool") this.heat = 0;
+    this.emit("use", key);
+    return true;
+  }
+
+  buy(cat, id) {
+    const maps = { weapon: ["weapons", WEAPONS], crew: ["crew", CREW], elements: ["elements", ELEMENT_UPGRADES], relics: ["relics", RELICS] };
+    const m = maps[cat];
+    if (!m) return false;
+    const [mapKey, list] = m;
     const item = list.find((x) => x.id === id);
     if (!item) return false;
+    const l = this.lv(this.state[mapKey], id);
+    if (item.max && l >= item.max) return false;
+    const price = cost(item, l);
+    if (this.state.coins < price) return false;
+    this.state.coins -= price;
+    this.state[mapKey][id] = l + 1;
+    this.emit("buy", { cat, id });
+    return true;
+  }
 
-    const lv = map[id] || 0;
-    if (item.max && lv >= item.max) return false;
-
-    const cost = upgradeCost(item, lv);
-    if (this.state.coins < cost) return false;
-
-    this.state.coins -= cost;
-    map[id] = lv + 1;
-    this.emit("buy", { category, id, level: lv + 1 });
+  buyResearch(id) {
+    const r = RESEARCH.find((x) => x.id === id);
+    if (!r) return false;
+    const l = this.lv(this.state.research, id);
+    const price = r.costEss(l);
+    if (this.state.essence < price) return false;
+    this.state.essence -= price;
+    this.state.research[id] = l + 1;
+    this.emit("research", id);
     return true;
   }
 
   buyTalent(id) {
     const t = TALENTS.find((x) => x.id === id);
-    if (!t || this.state.talents.includes(id)) return false;
-    if (this.state.souls < t.cost) return false;
+    if (!t || this.state.talents.includes(id) || this.state.souls < t.cost) return false;
     this.state.souls -= t.cost;
     this.state.talents.push(id);
-    if (t.effect === "startCoins") this.state.coins += t.value;
-    this.emit("talent", id);
+    if (t.fx === "start") this.state.coins += t.v;
     return true;
   }
 
-  canPrestige() {
-    return this.state.wave >= 5 || this.state.playerLevel >= 15;
-  }
+  canPrestige() { return this.state.wave >= 6 || this.state.level >= 12; }
 
   prestigeGain() {
-    const base = Math.floor(Math.sqrt(this.state.wave * this.state.playerLevel) / 2);
-    let gain = Math.max(1, base);
-    gain = Math.floor(gain * this.getTalentMult("prestigeGain"));
-    return gain;
+    return Math.max(1, Math.floor(Math.sqrt(this.state.wave * this.state.level) / 1.8 * this.talentMult("prestige")));
   }
 
   doPrestige() {
     if (!this.canPrestige()) return false;
-    const gain = this.prestigeGain();
-    this.state.prestigePoints += gain;
+    const g = this.prestigeGain();
+    this.state.prestigePts += g;
     this.state.prestigeCount++;
-    this.state.souls += Math.floor(gain / 2);
+    this.state.souls += Math.floor(g / 2);
 
     const keep = {
-      prestigePoints: this.state.prestigePoints,
-      prestigeCount: this.state.prestigeCount,
-      souls: this.state.souls,
-      talents: this.state.talents,
-      achievements: this.state.achievements,
-      settings: this.state.settings,
-      totalClicks: this.state.totalClicks,
-      totalDamage: this.state.totalDamage,
-      totalCoinsEarned: this.state.totalCoinsEarned,
-      totalCrits: this.state.totalCrits,
-      bossKills: this.state.bossKills,
-      maxCombo: this.state.maxCombo,
+      prestigePts: this.state.prestigePts, prestigeCount: this.state.prestigeCount,
+      souls: this.state.souls, talents: this.state.talents, achievements: this.state.achievements,
+      research: this.state.research, artifacts: this.state.artifacts,
+      clicks: this.state.clicks, damage: this.state.damage, coinsEarned: this.state.coinsEarned,
+      crits: this.state.crits, bossKills: this.state.bossKills, maxCombo: this.state.maxCombo,
+      rageMaxed: this.state.rageMaxed, settings: this.state.settings, unlockedZones: this.state.unlockedZones,
     };
 
-    const fresh = {
-      ...this.state,
-      coins: this.hasTalent("t_start") ? 500 : 0,
-      wave: 1,
-      killsOnWave: 0,
-      playerLevel: 1,
-      playerXp: 0,
-      weaponLevels: {},
-      helperLevels: {},
-      relicLevels: {},
-      skillCooldowns: {},
-      buffs: {},
-      ...keep,
-    };
-
-    Object.assign(this.state, fresh);
-    this.combo = 0;
+    Object.assign(this.state, {
+      ...defaultState(), ...keep,
+      coins: this.hasTalent("t3") ? 800 : 0,
+    });
+    this.combo = 0; this.rage = 0; this.overdrive = 0; this.heat = 0;
+    this.killStreak = 0;
     this.spawnEnemy();
-    this.emit("prestige", gain);
+    this.emit("prestige", g);
     return true;
   }
 
-  activateSkill(skillId) {
-    const cd = this.state.skillCooldowns[skillId] || 0;
-    if (cd > 0) return false;
-
-    const SKILLS = [
-      { id: "mega_slap", cd: 15, duration: 5 },
-      { id: "frenzy", cd: 30, duration: 8 },
-      { id: "gold_rain", cd: 45, duration: 10 },
-      { id: "freeze", cd: 60, duration: 12 },
-    ];
-    const skill = SKILLS.find((s) => s.id === skillId);
-    if (!skill) return false;
-
-    this.state.skillCooldowns[skillId] = skill.cd;
-    this.state.buffs[skillId] = skill.duration;
-    this.emit("skill", skillId);
-    return true;
+  checkChallenge() {
+    const c = CHALLENGES.find((x) => x.id === this.state.challenge);
+    if (!c || !c.check(this)) return;
+    this.state.coins += c.reward;
+    this.emit("challenge", c);
+    this.pickChallenge();
   }
 
   tick(dt) {
     const sec = dt / 1000;
 
-    if (this.comboTimer > 0) {
-      this.comboTimer -= dt;
-      if (this.comboTimer <= 0) {
-        this.combo = 0;
-        this.emit("comboReset");
-      }
+    if (this.comboT > 0) {
+      this.comboT -= dt;
+      if (this.comboT <= 0) { this.combo = 0; this.emit("comboReset"); }
     }
 
-    const dps = this.getAutoDps();
-    if (dps > 0) {
-      const autoDmg = dps * sec;
-      if (autoDmg >= 1) this.dealDamage(Math.floor(autoDmg), "auto");
+    if (this.streakT > 0) {
+      this.streakT -= dt;
+      if (this.streakT <= 0) this.killStreak = 0;
     }
+
+    if (this.weakT > 0) {
+      this.weakT -= dt;
+      if (this.weakT <= 0) this.spawnWeakSpot();
+    }
+
+    this.heat = Math.max(0, this.heat - sec * (8 + this.lv(this.state.research, "r_heat") * 3));
+    if (this.overdrive > 0 && this.overdrive < 100) this.overdrive = Math.max(0, this.overdrive - sec * 5);
+    if (this.rage > 0 && this.rage < 100) this.rage = Math.max(0, this.rage - sec * 3);
+
+    const dps = this.autoDps();
+    if (dps >= 1) this.dealDamage(Math.floor(dps * sec), "auto");
 
     if (this.state.buffs.frenzy) {
-      const frenzyClicks = 5 * sec;
-      for (let i = 0; i < frenzyClicks; i++) {
-        const { dmg } = this.rollDamage(true);
-        if (dmg > 0) this.dealDamage(dmg, "frenzy");
+      for (let i = 0; i < 6 * sec; i++) {
+        const { dmg } = this.rollHit(true);
+        this.dealDamage(dmg, "frenzy");
       }
     }
 
-    for (const key of Object.keys(this.state.buffs)) {
-      if (key === "freeze") continue;
-      this.state.buffs[key] -= sec;
-      if (this.state.buffs[key] <= 0) delete this.state.buffs[key];
+    for (const k of Object.keys(this.state.buffs)) {
+      if (k === "freeze") continue;
+      this.state.buffs[k] -= sec;
+      if (this.state.buffs[k] <= 0) delete this.state.buffs[k];
     }
     if (this.state.buffs.freeze) {
       this.state.buffs.freeze -= sec;
       if (this.state.buffs.freeze <= 0) delete this.state.buffs.freeze;
     }
 
-    for (const key of Object.keys(this.state.skillCooldowns)) {
-      if (this.state.skillCooldowns[key] > 0) {
-        this.state.skillCooldowns[key] -= sec;
-        if (this.state.skillCooldowns[key] < 0) this.state.skillCooldowns[key] = 0;
-      }
+    for (const k of Object.keys(this.state.skillCd)) {
+      this.state.skillCd[k] = Math.max(0, this.state.skillCd[k] - sec);
     }
 
     if (this.state.enemyType === "boss" && this.state.bossTimer > 0) {
       this.state.bossTimer -= sec;
       if (this.state.bossTimer <= 0) {
-        this.state.enemyHp = this.state.enemyMaxHp;
         this.spawnEnemy();
         this.emit("bossFail");
       }
+      // boss phase transitions
+      const pct = this.state.enemyHp / this.state.enemyMaxHp;
+      if (pct < 0.66 && this.state.bossPhase === 1) { this.state.bossPhase = 2; this.emit("phase", 2); }
+      if (pct < 0.33 && this.state.bossPhase === 2) { this.state.bossPhase = 3; this.emit("phase", 3); }
     }
 
-    if (!this.state.enemyRegenBlocked) {
-      this.state.enemyRegenBlocked = false;
-    }
-    if (!this.state.buffs.freeze && this.state.enemyHp < this.state.enemyMaxHp) {
-      const regen = this.state.enemyMaxHp * 0.002 * sec;
-      this.state.enemyHp = Math.min(this.state.enemyMaxHp, this.state.enemyHp + regen);
-    }
-
-    if (this.state.eventEnd > 0) {
-      this.state.eventEnd -= sec;
-      if (this.state.eventEnd <= 0) {
-        this.state.event = null;
-        this.emit("eventEnd");
+    if (this.state.enemyType === "boss" && this.state.bossPhase >= 2) {
+      this.parryT -= dt;
+      if (!this.parryActive && this.parryT <= 0) {
+        if (Math.random() < 0.003 * this.state.bossPhase) {
+          this.parryActive = true;
+          this.parryWindow = 1200;
+          this.emit("parryReady");
+        } else {
+          this.parryT = 2000;
+        }
       }
+      if (this.parryActive) {
+        this.parryWindow -= dt;
+        if (this.parryWindow <= 0) this.parryActive = false;
+      }
+    }
+
+    // regen
+    if (!this.state.buffs.freeze && this.state.enemyHp < this.state.enemyMaxHp) {
+      let reg = this.state.enemyMaxHp * 0.0015 * sec;
+      if (this.state.mutator?.id === "fast_regen") reg *= 2.5;
+      const iceLv = this.lv(this.state.elements, "ice");
+      reg *= Math.max(0.2, 1 - iceLv * 0.04);
+      this.state.enemyHp = Math.min(this.state.enemyMaxHp, this.state.enemyHp + reg);
+    }
+
+    // shock stun skip regen handled by freeze-like debuff - simplified
+
+    if (this.state.eventT > 0) {
+      this.state.eventT -= sec;
+      if (this.state.eventT <= 0) { this.state.event = null; this.emit("eventEnd"); }
+    }
+
+    this._eventTick += dt;
+    if (this._eventTick > 45000 && !this.state.event) {
+      this._eventTick = 0;
+      this.triggerEvent();
     }
 
     this.emit("tick");
   }
 
-  maybeRandomEvent() {
-    if (this.state.event || Math.random() > 0.0003) return;
-    const events = ["double_coins", "free_damage", "lucky_crit"];
-    this.state.event = events[Math.floor(Math.random() * events.length)];
-    this.state.eventEnd = 30;
-    this.emit("eventStart", this.state.event);
+  triggerEvent() {
+    const e = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+    this.state.event = { ...e };
+    this.state.eventT = e.dur;
+    this.emit("event", e);
   }
+}
+
+function defaultState() {
+  return {
+    coins: 0, souls: 0, essence: 0, prestigePts: 0, prestigeCount: 0,
+    wave: 1, zoneIdx: 0, killsInWave: 0, level: 1, xp: 0,
+    weapons: {}, crew: {}, elements: {}, relics: {}, research: {}, talents: [],
+    artifacts: [null, null, null], inventory: {},
+    clicks: 0, damage: 0, coinsEarned: 0, crits: 0, bossKills: 0,
+    maxCombo: 0, rageMaxed: 0, weakHits: 0, parryDone: false,
+    achievements: [], settings: { sound: true, fx: true, save: 30 },
+    enemyHp: 80, enemyMaxHp: 80, enemyShield: 0,
+    enemyType: "normal", enemyElement: "none",
+    bossTimer: 0, bossPhase: 1, mutator: null,
+    skillCd: {}, buffs: {}, event: null, eventT: 0,
+    challenge: null, challengeProg: {}, unlockedZones: [0], lastSave: Date.now(),
+  };
 }

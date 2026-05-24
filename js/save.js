@@ -1,11 +1,12 @@
-import { SAVE_KEY, defaultState } from "./data.js";
+import { migrateState, defaultState } from "./data.js";
+
+export const SAVE_KEY = "oleg_simulator_save_v3";
 
 export function loadSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return defaultState();
-    const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    return migrateState(JSON.parse(raw));
   } catch {
     return defaultState();
   }
@@ -26,8 +27,7 @@ export function exportSave(state) {
 }
 
 export function importSave(b64) {
-  const json = decodeURIComponent(escape(atob(b64)));
-  return { ...defaultState(), ...JSON.parse(json) };
+  return migrateState(JSON.parse(decodeURIComponent(escape(atob(b64)))));
 }
 
 export function resetSave() {

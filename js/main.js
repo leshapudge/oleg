@@ -1,71 +1,77 @@
 import { loadSave, saveGame } from "./save.js";
-import { GameEngine } from "./game.js";
-import { UIManager } from "./ui.js";
+import { Game } from "./game.js";
+import { UI } from "./ui.js";
 import { ACHIEVEMENTS } from "./data.js";
 
 const state = loadSave();
-const game = new GameEngine(state);
-const ui = new UIManager(game);
+const game = new Game(state);
+const ui = new UI(game);
 
-if (!state.enemyMaxHp || state.enemyHp <= 0) {
-  game.spawnEnemy();
-} else {
-  game.emit("enemySpawn", { type: state.enemyType, hp: state.enemyMaxHp });
-}
-
-game.onEnemyDeath = (coins) => {
-  if (state.settings.sound) ui.playSound("hit");
-};
-
-game.subscribe((event, data) => {
-  if (event === "levelUp") {
-    ui.toast(`Уровень ${data}! 🎉`);
-    if (state.settings.sound) ui.playSound("level");
-  }
-  if (event === "waveUp") {
-    ui.toast(`Новая волна: ${data}! 🌊`);
-  }
-  if (event === "bossFail") {
-    ui.toast("Босс ушёл! Успей в следующий раз.");
-  }
-  if (event === "eventStart") {
-    const labels = {
-      double_coins: "Событие: двойные монеты!",
-      free_damage: "Событие: усиление урона!",
-      lucky_crit: "Событие: удачный крит!",
-    };
-    ui.toast(labels[data] || "Случайное событие!");
-  }
-  if (event === "kill") checkAchievements();
-  ui.update();
-});
+if (!state.enemyMaxHp || state.enemyHp <= 0) game.spawnEnemy();
 
 function checkAchievements() {
   for (const a of ACHIEVEMENTS) {
     if (state.achievements.includes(a.id)) continue;
-    if (a.check(state)) {
+    if (a.ok(state)) {
       state.achievements.push(a.id);
-      ui.toast(`🏆 ${a.name}: ${a.desc}`);
-      state.coins += 100 * state.achievements.length;
+      state.coins += 50 * state.achievements.length;
+      ui.toast(`🏆 ${a.name}`);
     }
   }
 }
+
+game.on((ev, data) => {
+  switch (ev) {
+    case "level":
+      ui.toast(`УРОВЕНЬ ${data}!`);
+      if (state.settings.sound) ui.snd("level");
+      break;
+    case "wave":
+      ui.toast(`Волна ${data}!`);
+      break;
+    case "kill":
+      if (state.settings.sound) ui.snd("hit");
+      checkAchievements();
+      break;
+    case "event":
+      ui.toast(data.msg);
+      break;
+    case "loot":
+      ui.toast(`Лут: ${data}`);
+      break;
+    case "artifact":
+      ui.toast(`Артефакт: ${data.name}!`);
+      break;
+    case "bossFail":
+      ui.toast("Босс сбежал!");
+      break;
+    case "phase":
+      ui.toast(`Фаза босса ${data}!`);
+      break;
+    case "challenge":
+      ui.toast(`Челлендж: +${data.reward}₽`);
+      break;
+    case "prestige":
+      ui.toast(`Престиж +${data} ★`);
+      break;
+  }
+  if (ev !== "tick" && ev !== "hit") ui.update();
+});
 
 ui.init();
 checkAchievements();
 
 let last = performance.now();
 function loop(now) {
-  const dt = Math.min(now - last, 100);
+  const dt = Math.min(now - last, 50);
   last = now;
   game.tick(dt);
-  game.maybeRandomEvent();
-  if (now % 500 < 20) ui.update();
+  if (Math.floor(now / 100) % 2 === 0) ui.update();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-setInterval(() => saveGame(state), (state.settings.saveInterval || 30) * 1000);
+setInterval(() => saveGame(state), (state.settings?.save || 30) * 1000);
 window.addEventListener("beforeunload", () => saveGame(state));
 
-console.log("%c🍑 Олег Симулятор загружен!", "font-size:16px;font-weight:bold;color:#ff6b9d");
+console.log("%c ОЛЕГБОЙ v3 ", "background:#b8ff3c;color:#102010;font-weight:bold;padding:4px 8px");

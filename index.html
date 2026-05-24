@@ -4,50 +4,60 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Олег — получай</title>
-  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=DM+Sans:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles/main.css" />
 </head>
 <body>
   <div id="fx-layer"></div>
 
-  <div class="shell">
-    <header class="top">
-      <div class="title-block">
-        <h1>ОЛЕГ — ПОЛУЧАЙ</h1>
-        <p id="place-line">Двор · волна 1</p>
+  <div class="game">
+    <header class="hud">
+      <div class="hud-brand">
+        <span class="logo">ОЛЕГ</span>
+        <span class="hud-zone" id="place-line">Двор · волна 1</span>
       </div>
-      <div class="money-big">
-        <span class="money-label">Бабки</span>
-        <span class="money-val" id="coins">0</span>
+      <div class="hud-stats">
+        <div class="stat-pill stat-coins">
+          <span class="stat-ico">💰</span>
+          <span class="stat-val" id="coins">0</span>
+        </div>
+        <div class="stat-pill stat-lvl">
+          <span class="stat-ico">⚡</span>
+          <span>ур. <b id="player-level">1</b></span>
+          <div class="stat-xp"><div class="xp-fill" id="xp-fill"></div></div>
+        </div>
       </div>
+      <button type="button" class="hud-help" id="btn-help" title="Помощь">?</button>
     </header>
 
-    <nav class="world-map" id="zone-map" aria-label="Локации"></nav>
+    <div class="game-body">
+      <nav class="dock" id="dock" aria-label="Меню"></nav>
 
-    <div class="rpg-bar">
-      <div class="materials-strip" id="materials-strip"></div>
-      <div class="equip-strip" id="equip-strip"></div>
-      <div class="activity-bar" id="activity-bar"></div>
-    </div>
+      <main class="arena">
+        <div class="objective" id="objective">
+          <span class="obj-label">Цель</span>
+          <span class="obj-text" id="objective-text">Жми по жопе</span>
+          <span class="obj-reward" id="objective-reward"></span>
+        </div>
 
-    <div class="zone-progress-bar">
-      <span id="zone-desc">Двор — руби дерево и бей олегов</span>
-      <span id="zone-progress-text">Жми локацию на карте</span>
-    </div>
-
-    <main class="main-row">
-      <section class="fight-zone">
-        <div class="enemy-card">
-          <span class="enemy-type" id="enemy-badge">Обычный олег</span>
-          <h2 class="enemy-title" id="enemy-name">Олег</h2>
-          <p class="enemy-quote" id="enemy-quote">«Я ничего не делал!»</p>
+        <article class="combat-card">
+          <header class="combat-head">
+            <span class="enemy-type" id="enemy-badge">Олег</span>
+            <div class="combat-names">
+              <h2 id="enemy-name">Олег-дворник</h2>
+              <p id="enemy-quote">«Я тут просто сорняки полол, бля»</p>
+            </div>
+          </header>
 
           <div class="hp-box">
-            <div class="hp-top"><span>Жопа олега</span><span id="enemy-hp-text">100 / 100</span></div>
+            <div class="hp-top">
+              <span>Жопа</span>
+              <span id="enemy-hp-text">100 / 100</span>
+            </div>
             <div class="hp-bar"><div class="hp-fill" id="enemy-hp-fill"></div></div>
           </div>
 
-          <p class="boss-warn hidden" id="boss-warn">⚠ Босс сбежит через <b id="boss-timer">30</b> сек!</p>
+          <p class="boss-warn hidden" id="boss-warn">⚠ Босс сбежит через <b id="boss-timer">30</b> сек</p>
 
           <div class="stage bg-yard" id="stage">
             <button class="spot spot-l hidden" id="weak-left" type="button">x3</button>
@@ -59,43 +69,59 @@
             </button>
           </div>
 
-          <div class="simple-stats">
-            <span>Удар: <b id="dpc-display">1</b></span>
-            <span>Комбо: <b id="combo-mult">x1</b> (<span id="combo-count">0</span>)</span>
-            <span>Авто: <b id="dps-display">0</b>/сек</span>
+          <div class="meters">
+            <div class="meter" title="Комбо">
+              <span class="meter-label">Комбо <b id="combo-mult">x1</b></span>
+              <div class="meter-track"><div class="meter-fill meter-combo" id="combo-fill"></div></div>
+            </div>
+            <div class="meter" title="Жар">
+              <span class="meter-label">Жар</span>
+              <div class="meter-track"><div class="meter-fill meter-heat" id="heat-fill"></div></div>
+            </div>
           </div>
-          <div class="combo-bar-wrap">
-            <div class="combo-bar"><div class="combo-fill" id="combo-fill"></div></div>
+
+          <div class="combat-stats">
+            <span>Удар <b id="dpc-display">1</b></span>
+            <span>Авто <b id="dps-display">0</b>/с</span>
+            <span>Комбо <b id="combo-count">0</b></span>
           </div>
+
+          <div class="equip-mini" id="equip-mini"></div>
+        </article>
+
+        <div class="skills-row hidden" id="skills-wrap">
           <div class="skills" id="skills-dock"></div>
         </div>
-        <p class="tip-line" id="event-ticker">Кликай → бабки → крафти → ебашь</p>
-      </section>
+        <p class="tip-line" id="event-ticker">Жми → бабки → качайся → доминируй</p>
+      </main>
 
-      <aside class="shop-zone">
-        <div class="lvl-box">
-          <span>Ты ур. <b id="player-level">1</b></span>
-          <div class="xp-bar"><div class="xp-fill" id="xp-fill"></div></div>
-        </div>
-        <nav class="tabs">
-          <button class="tab active" data-tab="weapon">Хуй</button>
-          <button class="tab" data-tab="crew">Братва</button>
-          <button class="tab" data-tab="craft">Крафт</button>
-          <button class="tab" data-tab="gear">Шмот</button>
-          <button class="tab" data-tab="more">Ещё</button>
-        </nav>
-        <div class="shop-list" id="shop-content"></div>
-        <button class="help-btn" id="btn-help">❓ Как играть</button>
+      <aside class="side-panel">
+        <header class="panel-head">
+          <h3 id="panel-title">Прогресс</h3>
+        </header>
+        <div class="panel-body" id="panel-content"></div>
       </aside>
-    </main>
+    </div>
   </div>
 
   <div class="modal hidden" id="modal-overlay">
     <div class="modal-box">
-      <button class="modal-x" id="modal-close">×</button>
+      <button type="button" class="modal-x" id="modal-close">×</button>
       <div id="modal-body"></div>
     </div>
   </div>
+
+  <div class="unlock-toast hidden" id="unlock-toast">
+    <div class="unlock-inner">
+      <span class="unlock-ico" id="unlock-ico">🎉</span>
+      <div>
+        <b id="unlock-title">Новое!</b>
+        <p id="unlock-text"></p>
+      </div>
+      <button type="button" class="unlock-ok" id="unlock-ok">Понял</button>
+    </div>
+  </div>
+
   <div class="toasts" id="toasts"></div>
   <script type="module" src="js/main.js"></script>
 </body>

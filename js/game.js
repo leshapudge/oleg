@@ -6,6 +6,7 @@ import {
 import {
   ITEMS, RECIPES, ZONE_ACTIVITIES, masteryLevel,
 } from "./rpg-data.js";
+import { UNLOCKS, tryCompleteObjective, grantVeteranUnlocks } from "./tutorial.js";
 
 export class Game {
   constructor(state) {
@@ -32,6 +33,20 @@ export class Game {
 
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   emit(ev, data) { this.listeners.forEach((f) => f(ev, data)); }
+
+  checkProgress() {
+    grantVeteranUnlocks(this.state);
+    for (const u of UNLOCKS) {
+      if ((this.state.unlocks || []).includes(u.id)) continue;
+      if (u.check(this.state, this)) {
+        if (!this.state.unlocks) this.state.unlocks = [];
+        this.state.unlocks.push(u.id);
+        this.emit("unlock", u);
+      }
+    }
+    const obj = tryCompleteObjective(this.state);
+    if (obj) this.emit("objective", obj);
+  }
 
   lv(map, id) { return map[id] || 0; }
 
@@ -343,6 +358,7 @@ export class Game {
     this.dropMaterials();
     this.tryLoot();
     this.checkChallenge();
+    this.checkProgress();
     this.spawnEnemy();
     this.emit("kill", { coins, ess });
   }
@@ -390,6 +406,7 @@ export class Game {
       this.state.xp -= this.xpNeed();
       this.state.level++;
       this.emit("level", this.state.level);
+      this.checkProgress();
     }
   }
 
@@ -421,6 +438,7 @@ export class Game {
     if (this.heat >= 100) dmg = Math.floor(dmg * 0.5);
 
     dmg = this.dealDamage(dmg, "click", { crit, weak: isWeak });
+    this.checkProgress();
     return { dmg, crit, weak: isWeak };
   }
 
@@ -482,6 +500,7 @@ export class Game {
     this.state.coins -= price;
     this.state[mapKey][id] = l + 1;
     this.emit("buy", { cat, id });
+    this.checkProgress();
     return true;
   }
 
@@ -525,6 +544,8 @@ export class Game {
       research: this.state.research, artifacts: this.state.artifacts,
       materials: this.state.materials, items: this.state.items,
       equip: this.state.equip, masteries: this.state.masteries,
+      unlocks: this.state.unlocks, objectivesDone: this.state.objectivesDone,
+      visitedZones: this.state.visitedZones,
       clicks: this.state.clicks, damage: this.state.damage, coinsEarned: this.state.coinsEarned,
       crits: this.state.crits, bossKills: this.state.bossKills, maxCombo: this.state.maxCombo,
       rageMaxed: this.state.rageMaxed, settings: this.state.settings, unlockedZones: this.state.unlockedZones,
@@ -689,7 +710,10 @@ export class Game {
   travelTo(idx) {
     if (!this.canTravel(idx) || idx === this.state.zoneIdx) return false;
     this.state.zoneIdx = idx;
+    if (!this.state.visitedZones) this.state.visitedZones = [0];
+    if (!this.state.visitedZones.includes(idx)) this.state.visitedZones.push(idx);
     this.emit("travel", ZONES[idx]);
+    this.checkProgress();
     this.spawnEnemy();
     return true;
   }
@@ -725,6 +749,7 @@ export class Game {
     this.addItem(r.out, 1);
     this.gainMastery("craft", 15 + r.craftLv * 5);
     this.emit("craft", r);
+    this.checkProgress();
     return true;
   }
 
@@ -737,6 +762,7 @@ export class Game {
     this.state.items[itemId]--;
     if (this.state.items[itemId] <= 0) delete this.state.items[itemId];
     this.emit("equip", itemId);
+    this.checkProgress();
     return true;
   }
 
@@ -782,6 +808,7 @@ export class Game {
     if (act.gather === "wood") this.gainMastery("craft", 2);
     this.state.activityCd = 1.8;
     this.emit("gather", { mat: act.gather, amount });
+    this.checkProgress();
     return true;
   }
 

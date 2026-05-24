@@ -1,4 +1,4 @@
-export const SAVE_KEY = "oleg_simulator_save_v4";
+export const SAVE_KEY = "oleg_simulator_save_v5";
 
 export const ZONES = [
   { id: "yard", name: "Двор", icon: "🏠", desc: "Дерево и олеги.", hp: 1, coins: 1, bg: "bg-yard", unlockLv: 1 },
@@ -239,6 +239,9 @@ export function defaultState() {
     equip: { weapon: null, armor: null, tool: null, trinket: null },
     masteries: { combat: 0, fishing: 0, craft: 0, endurance: 0, scavenge: 0 },
     activityCd: 0,
+    unlocks: [],
+    objectivesDone: [],
+    visitedZones: [0],
     unlockedZones: [0, 1, 2, 3, 4, 5, 6],
     lastSave: Date.now(),
   };
@@ -268,6 +271,9 @@ export function migrateState(raw) {
   if (!raw.equip) raw.equip = { weapon: null, armor: null, tool: null, trinket: null };
   if (!raw.masteries) raw.masteries = { combat: 0, fishing: 0, craft: 0, endurance: 0, scavenge: 0 };
   if (raw.activityCd == null) raw.activityCd = 0;
+  if (!raw.unlocks) raw.unlocks = [];
+  if (!raw.objectivesDone) raw.objectivesDone = [];
+  if (!raw.visitedZones) raw.visitedZones = [raw.zoneIdx || 0];
   if (!raw.zoneKills) raw.zoneKills = 0;
   if (raw.zoneBossPending == null) raw.zoneBossPending = false;
   return { ...d, ...raw, settings: { sound: true, fx: true, save: 30, ...raw.settings } };

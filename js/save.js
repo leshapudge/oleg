@@ -1,6 +1,6 @@
 import { migrateState, defaultState } from "./data.js";
 
-export const SAVE_KEY = "oleg_simulator_save_v4";
+export const SAVE_KEY = "oleg_simulator_save_v5";
 
 export function loadSave() {
   try {

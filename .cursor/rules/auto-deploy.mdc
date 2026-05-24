@@ -1,0 +1,37 @@
+---
+description: Автоматически деплоить игру на GitHub Pages после изменений
+globs: index.html,styles/**,js/**,.github/**
+alwaysApply: false
+---
+
+# Auto-deploy ОЛЕГБОЙ
+
+После любых изменений в игре (HTML, CSS, JS, workflow) **сам** заливай на GitHub без отдельной просьбы пользователя.
+
+## Когда деплоить
+
+- Закончил правки в `index.html`, `styles/`, `js/` или `.github/workflows/`
+- Пользователь просит обновить сайт / задеплоить / запушить
+
+## Что делать
+
+1. Проверить `gh auth status` — аккаунт `leshapudge`, remote `https://github.com/leshapudge/oleg.git`
+2. Закоммитить только файлы игры (не секреты, не `.env`)
+3. `git push origin main`
+4. Сообщить ссылку: https://leshapudge.github.io/oleg/
+5. Напомнить: жёсткое обновление Cmd+Shift+R если кэш
+
+## Коммиты
+
+- Короткое сообщение на русском или английском, суть изменения
+- Не спрашивать «закоммитить?» — пользователь хочет автодеплой
+
+## Если push не прошёл
+
+- Показать ошибку и что сделать (gh auth login, права на repo)
+- Не оставлять изменения только локально без предупреждения
+
+## Сайт
+
+- Репо: https://github.com/leshapudge/oleg
+- Pages: GitHub Actions или main → https://leshapudge.github.io/oleg/

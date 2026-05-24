@@ -27,6 +27,10 @@ export class Game {
     this._crewCoin = 1;
     this._eventTick = 0;
     this._weakSide = "left";
+    this.stamina = 100;
+    this.olegRage = 0;
+    this.heavyCd = 0;
+    this._counterPending = false;
     this.pickChallenge();
     this.pickMutator();
   }
@@ -250,6 +254,34 @@ export class Game {
     this.state.parryDone = false;
   }
 
+  playerPower() {
+    return Math.max(3, this.clickDamage() + this.autoDps() * 1.8);
+  }
+
+  calcBaseEnemyLevel() {
+    const s = this.state;
+    let lv = s.level;
+    lv += Math.floor(s.wave / 2);
+    lv += Math.floor(s.zoneIdx * 0.6);
+    lv += Math.floor(s.prestigePts * 1.2);
+    lv += Math.floor(this.masteryLv("combat") / 2);
+    return Math.max(1, lv);
+  }
+
+  computeEnemyHp(type, enemyLv) {
+    const et = ENEMY_TYPES[type];
+    const z = this.zone();
+    const power = this.playerPower();
+    const ttk = { normal: 11, elite: 16, mini: 22, boss: 40 }[type] || 11;
+    let hp = Math.max(35, power * ttk * 0.38) * et.hp * z.hp;
+    hp *= Math.pow(1.065, enemyLv - 1);
+    hp *= z.loopMult;
+    if (this.state.mutator?.id === "armored") hp *= 1.5;
+    if (this.state.mutator?.id === "greedy") hp *= 1.3;
+    if (this.state.mutator?.id === "thin") hp *= 0.7;
+    return Math.floor(hp);
+  }
+
   spawnEnemy() {
     const z = this.zone();
     let type = "normal";
@@ -260,24 +292,24 @@ export class Game {
     else if (k > 0 && k % 7 === 0) type = "mini";
     else if (k > 0 && k % 4 === 0) type = "elite";
 
+    const typeLv = { normal: 0, elite: 2, mini: 5, boss: 11 };
+    this.state.enemyLevel = this.calcBaseEnemyLevel() + typeLv[type];
+    this.state.enemyAtk = Math.floor(2 + this.state.enemyLevel * 1.15);
+
     const et = ENEMY_TYPES[type];
-    let hp = 45 * Math.pow(1.11, this.state.wave) * z.hp * z.loopMult * et.hp;
-
-    if (this.state.mutator?.id === "armored") hp *= 1.5;
-    if (this.state.mutator?.id === "greedy") hp *= 1.3;
-    if (this.state.mutator?.id === "thin") hp *= 0.7;
-
     const els = ["fire", "ice", "shock"];
     this.state.enemyElement = type === "normal" ? "none" : els[Math.floor(Math.random() * els.length)];
     this.state.enemyType = type;
     const skin = pickOlegSkin(type, this.state.zoneIdx);
     this.state.enemySkin = skin.id;
-    this.state.enemyMaxHp = Math.floor(hp);
-    this.state.enemyHp = this.state.enemyMaxHp;
-    this.state.enemyShield = this.state.mutator?.id === "armored" ? Math.floor(hp * 0.25) : 0;
 
+    this.state.enemyMaxHp = this.computeEnemyHp(type, this.state.enemyLevel);
+    this.state.enemyHp = this.state.enemyMaxHp;
+    this.state.enemyShield = this.state.mutator?.id === "armored" ? Math.floor(this.state.enemyMaxHp * 0.25) : 0;
+
+    this.olegRage = 0;
     this.spawnWeakSpot();
-    this.emit("spawn", { type });
+    this.emit("spawn", { type, level: this.state.enemyLevel });
   }
 
   spawnWeakSpot() {
@@ -311,6 +343,7 @@ export class Game {
     const et = ENEMY_TYPES[this.state.enemyType];
     const z = this.zone();
     let coins = 12 * this.state.wave * et.coins * z.coins;
+    coins *= 1 + this.state.enemyLevel * 0.045;
 
     coins *= this.relicMult("coin");
     coins *= this._crewCoin;
@@ -330,7 +363,7 @@ export class Game {
     this.state.coinsEarned += coins;
 
     let xp = Math.floor(12 * this.state.wave * et.xp * this.relicMult("xp"));
-    xp = Math.floor(xp * this.zoneBonus("xp"));
+    xp = Math.floor(xp * this.zoneBonus("xp") * (1 + this.state.enemyLevel * 0.035));
     this.gainXp(xp);
     this.gainMastery("combat", Math.max(2, Math.floor(xp / 4)));
 
@@ -414,12 +447,16 @@ export class Game {
 
   click(side = null) {
     this.state.clicks++;
+    const stamCost = 10;
+    const tired = this.stamina < stamCost;
+    if (!tired) this.stamina -= stamCost;
+
     this.combo++;
     this.comboT = this.comboWindow();
     if (this.combo > this.state.maxCombo) this.state.maxCombo = this.combo;
 
     const heatRed = this.equipStats().heatRed + (this.masteryLv("endurance") - 1) * 0.03;
-    const heatGain = (4 - (this.lv(this.state.crew, "it") * 0.15)) * Math.max(0.35, 1 - heatRed);
+    const heatGain = (3.5 - (this.lv(this.state.crew, "it") * 0.12)) * Math.max(0.35, 1 - heatRed);
     this.heat = Math.min(100, this.heat + Math.max(1, heatGain));
     const overGain = (8 + this.combo * 0.05) * this.researchMult("r_over");
     this.overdrive = Math.min(100, this.overdrive + overGain);
@@ -432,26 +469,56 @@ export class Game {
       this.state.weakHits++;
       this.weakT = 0;
       this.spawnWeakSpot();
+      this.olegRage = Math.max(0, this.olegRage - 15);
     }
 
     let { dmg, crit } = this.rollHit(true);
+    if (tired) dmg = Math.floor(dmg * 0.55);
     if (this.heat >= 100) dmg = Math.floor(dmg * 0.5);
 
-    dmg = this.dealDamage(dmg, "click", { crit, weak: isWeak });
+    dmg = this.dealDamage(dmg, "click", { crit, weak: isWeak, tired });
     this.checkProgress();
-    return { dmg, crit, weak: isWeak };
+    return { dmg, crit, weak: isWeak, tired };
+  }
+
+  heavyStrike() {
+    if (this.heavyCd > 0 || this.stamina < 22) return null;
+    this.stamina -= 22;
+    this.heavyCd = 2.8;
+    this.state.clicks++;
+    this.combo += 2;
+    this.comboT = this.comboWindow();
+
+    let dmg = Math.floor(this.clickDamage() * 2.8);
+    if (Math.random() < this.critChance() + 0.1) {
+      dmg = Math.floor(dmg * this.critMult());
+    }
+    dmg = this.dealDamage(dmg, "heavy", { crit: true });
+    this.olegRage = Math.max(0, this.olegRage - 20);
+    this.checkProgress();
+    return { dmg, crit: true };
+  }
+
+  enemyCounter() {
+    this.combo = Math.floor(this.combo * 0.45);
+    this.heat = Math.min(100, this.heat + 18 + this.state.enemyLevel * 0.3);
+    this.stamina = Math.max(0, this.stamina - 15);
+    this.emit("counterHit");
   }
 
   weakClick(side) { return this.click(side); }
 
   parry() {
     if (!this.parryActive) return false;
+    const wasCounter = this._counterPending;
     this.parryActive = false;
+    this._counterPending = false;
     this.state.parryDone = true;
     this.rage = Math.min(100, this.rage + 25);
     this.overdrive = Math.min(100, this.overdrive + 30);
-    const dmg = Math.floor(this.state.enemyMaxHp * 0.08);
+    const dmg = Math.floor(this.state.enemyMaxHp * (wasCounter ? 0.12 : 0.08));
     this.dealDamage(dmg, "parry", { crit: true });
+    this.olegRage = 0;
     this.emit("parry");
     return true;
   }
@@ -556,6 +623,7 @@ export class Game {
       coins: this.hasTalent("t3") ? 800 : 0,
     });
     this.combo = 0; this.rage = 0; this.overdrive = 0; this.heat = 0;
+    this.stamina = 100; this.olegRage = 0; this.heavyCd = 0;
     this.killStreak = 0;
     this.spawnEnemy();
     this.emit("prestige", g);
@@ -591,6 +659,9 @@ export class Game {
     this.heat = Math.max(0, this.heat - sec * (8 + this.lv(this.state.research, "r_heat") * 3));
     if (this.overdrive > 0 && this.overdrive < 100) this.overdrive = Math.max(0, this.overdrive - sec * 5);
     if (this.rage > 0 && this.rage < 100) this.rage = Math.max(0, this.rage - sec * 3);
+
+    this.stamina = Math.min(100, this.stamina + sec * 16);
+    if (this.heavyCd > 0) this.heavyCd = Math.max(0, this.heavyCd - sec);
 
     const dps = this.autoDps();
     if (dps >= 1) this.dealDamage(Math.floor(dps * sec), "auto");
@@ -634,14 +705,34 @@ export class Game {
         if (Math.random() < 0.003 * this.state.bossPhase) {
           this.parryActive = true;
           this.parryWindow = 1200;
+          this._counterPending = true;
           this.emit("parryReady");
         } else {
           this.parryT = 2000;
         }
       }
-      if (this.parryActive) {
-        this.parryWindow -= dt;
-        if (this.parryWindow <= 0) this.parryActive = false;
+    }
+
+    if (this.state.enemyHp > 0 && !this.parryActive) {
+      const rageRate = 3.5 + this.state.enemyLevel * 0.55;
+      const typeMult = this.state.enemyType === "boss" ? 0.5 : this.state.enemyType === "elite" ? 1.2 : 1;
+      this.olegRage = Math.min(100, this.olegRage + sec * rageRate * typeMult);
+      if (this.olegRage >= 100) {
+        this.olegRage = 0;
+        this.parryActive = true;
+        this.parryWindow = 1400;
+        this._counterPending = true;
+        this.emit("counterReady");
+      }
+    }
+
+    if (this.parryActive) {
+      this.parryWindow -= dt;
+      if (this.parryWindow <= 0) {
+        const wasCounter = this._counterPending;
+        this.parryActive = false;
+        this._counterPending = false;
+        if (wasCounter) this.enemyCounter();
       }
     }
 

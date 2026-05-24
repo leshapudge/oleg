@@ -270,9 +270,15 @@ body {
 
 .combat-head {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: flex-start;
+  flex-wrap: wrap;
   margin-bottom: 10px;
+}
+
+.combat-names {
+  flex: 1;
+  min-width: 140px;
 }
 
 .combat-names h2 {
@@ -451,7 +457,7 @@ body {
 .meters {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -479,7 +485,49 @@ body {
 }
 
 .meter-combo { background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+.meter-stamina { background: linear-gradient(90deg, #7b8cde, var(--blue)); }
 .meter-heat { background: linear-gradient(90deg, #ff9f1c, var(--red)); }
+.meter-oleg { background: linear-gradient(90deg, #933, var(--red)); }
+
+.enemy-lvl {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--red);
+  background: rgba(239, 71, 111, 0.12);
+  border: 1px solid rgba(239, 71, 111, 0.35);
+  border-radius: 6px;
+}
+
+.strike-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.heavy-btn {
+  padding: 8px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(255, 107, 74, 0.15);
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.heavy-btn:hover:not(:disabled) {
+  background: rgba(255, 107, 74, 0.28);
+  filter: brightness(1.1);
+}
+
+.heavy-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .combat-stats {
   display: flex;

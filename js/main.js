@@ -72,6 +72,12 @@ game.on((ev, data) => {
       ui.toast(`✓ ${data.text} (+${data.coins}₽)`);
       if (state.settings.sound) ui.snd("crit");
       break;
+    case "counterReady":
+    case "parryReady":
+      break;
+    case "counterHit":
+      ui.toast("Олег ответил! Комбо слетело, жар вырос.");
+      break;
     case "prestige":
       ui.toast(`Престиж +${data}★`);
       break;

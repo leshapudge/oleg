@@ -55,11 +55,12 @@ export class UI {
     const ids = [
       "coins", "place-line", "dock", "panel-title", "panel-content",
       "objective-text", "objective-reward", "objective", "stage",
-      "enemy-badge", "enemy-name", "enemy-quote",
+      "enemy-badge", "enemy-name", "enemy-quote", "enemy-level", "enemy-atk-display",
       "enemy-hp-text", "enemy-hp-fill", "boss-warn", "boss-timer",
-      "weak-left", "weak-right", "parry-prompt", "oleg-char",
-      "click-target", "combo-fill", "combo-mult", "combo-count",
-      "heat-fill", "dpc-display", "dps-display", "equip-mini",
+      "weak-left", "weak-right", "parry-prompt", "oleg-char", "heavy-strike",
+      "click-target", "combo-fill", "combo-mult",
+      "heat-fill", "stamina-fill", "oleg-rage-fill", "oleg-rage-wrap",
+      "dpc-display", "dps-display", "equip-mini",
       "skills-wrap", "skills-dock", "player-level", "xp-fill",
       "event-ticker", "modal-overlay", "modal-body", "toasts",
       "unlock-toast", "unlock-ico", "unlock-title", "unlock-text",
@@ -76,7 +77,14 @@ export class UI {
     this.el["weak-left"].onclick = (e) => { e.stopPropagation(); this.fx(e, this.g.weakClick("left")); };
     this.el["weak-right"].onclick = (e) => { e.stopPropagation(); this.fx(e, this.g.weakClick("right")); };
     this.el["parry-prompt"].onclick = () => {
-      if (this.g.parry()) this.toast("ОТБИЛ!");
+      if (this.g.parry()) this.toast("ОТБИТЬ! В жопу ему!");
+    };
+    const heavy = this.$("heavy-strike");
+    if (heavy) heavy.onclick = (e) => {
+      const r = this.g.heavyStrike();
+      if (r) this.fx(e, r);
+      else if (this.g.heavyCd > 0) this.toast(`Кд ${Math.ceil(this.g.heavyCd)}с`);
+      else this.toast("Мало сил!");
     };
     this.$("btn-help").onclick = () => this.showHelp();
     this.$("modal-close").onclick = () => this.el["modal-overlay"].classList.add("hidden");
@@ -86,11 +94,11 @@ export class UI {
     this.$("unlock-ok").onclick = () => this.dismissUnlock();
   }
 
-  fx(e, { dmg, crit, weak }) {
+  fx(e, { dmg, crit, weak, tired }) {
     playHitAnim(this.el["oleg-char"], crit);
     const x = e.clientX ?? innerWidth / 2;
     const y = e.clientY ?? innerHeight / 2;
-    const words = weak ? WEAK_WORDS : crit ? CRIT_WORDS : HIT_WORDS;
+    const words = weak ? WEAK_WORDS : crit ? CRIT_WORDS : tired ? ["Слабак...", "Устал..."] : HIT_WORDS;
     const word = words[Math.floor(Math.random() * words.length)];
     this.float(x, y, `${word} ${fmt(dmg)}`, crit, weak);
     if (this.g.state.settings.fx) this.burst(x, y);
@@ -462,15 +470,14 @@ export class UI {
 
   showHelp() {
     this.el["modal-body"].innerHTML = `
-      <h2>Как играть</h2>
+      <h2>Арена Олегов</h2>
       <ol class="help-list">
-        <li><b>Жми по жопе</b> — бабки и опыт.</li>
-        <li><b>Цель сверху</b> — подсказывает, что делать дальше.</li>
-        <li><b>Меню слева</b> — открывается постепенно.</li>
-        <li><b>Удары</b> — апгрейды за бабки.</li>
-        <li><b>Мир</b> — локации, ресурсы, рыбалка.</li>
-        <li><b>Крафт → Шмот</b> — оружие и броня.</li>
-        <li>Жёлтые круги x3 — тройной урон.</li>
+        <li><b>Хуём в жопу</b> — основной удар. Жрёт «Силы» — не спамь.</li>
+        <li><b>Братва</b> — бьёт сама (авто-DPS), ты тактически долбишь.</li>
+        <li><b>Олег качается</b> — его ур. растёт с твоим. HP подстраивается.</li>
+        <li><b>Злость олега</b> — заполнится → жми ОТБИТЬ или получишь.</li>
+        <li><b>Мощный хуй</b> — x3 урон, перезарядка.</li>
+        <li><b>x3 круги</b> — слабое место, тройной урон.</li>
       </ol>
       <p class="help-note">Не спеши — игра сама откроет механики.</p>
     `;
@@ -487,6 +494,8 @@ export class UI {
     this.el["place-line"].textContent = `${z.name} · волна ${s.wave}`;
     this.el["enemy-badge"].textContent = et?.tag || "Олег";
     this.el["enemy-badge"].className = "enemy-type type-" + s.enemyType;
+    this.el["enemy-level"].textContent = `ур. ${s.enemyLevel || 1}`;
+    this.el["enemy-atk-display"].textContent = s.enemyAtk || 1;
 
     this.applySkin();
     this.el.stage.className = "stage " + z.bg;
@@ -508,8 +517,21 @@ export class UI {
     const comboPct = hasUnlock(s, "combo") ? Math.min(100, g.combo) : 0;
     this.el["combo-fill"].style.width = comboPct + "%";
     this.el["combo-mult"].textContent = "x" + g.comboMult().toFixed(1);
-    this.el["combo-count"].textContent = g.combo;
     this.el["heat-fill"].style.width = g.heat + "%";
+    this.el["stamina-fill"].style.width = g.stamina + "%";
+
+    const showRage = hasUnlock(s, "counter");
+    this.el["oleg-rage-wrap"].classList.toggle("hidden", !showRage);
+    if (showRage) this.el["oleg-rage-fill"].style.width = g.olegRage + "%";
+
+    const showHeavy = hasUnlock(s, "heavy");
+    const hb = this.el["heavy-strike"];
+    if (hb) {
+      hb.classList.toggle("hidden", !showHeavy);
+      hb.disabled = g.heavyCd > 0 || g.stamina < 22;
+      hb.textContent = g.heavyCd > 0 ? `💥 ${Math.ceil(g.heavyCd)}с` : "💥 Мощный хуй";
+    }
+
     this.el["dpc-display"].textContent = fmt(g.clickDamage());
     this.el["dps-display"].textContent = fmt(g.autoDps());
 

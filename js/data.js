@@ -1,4 +1,4 @@
-export const SAVE_KEY = "oleg_simulator_save_v5";
+export const SAVE_KEY = "oleg_simulator_save_v6";
 
 export const ZONES = [
   { id: "yard", name: "Двор", icon: "🏠", desc: "Дерево и олеги.", hp: 1, coins: 1, bg: "bg-yard", unlockLv: 1 },
@@ -115,12 +115,12 @@ export const SKILLS = [
 ];
 
 export const SIMPLE_TIPS = [
-  "Жми по жопе = бабки. Всё просто.",
-  "Жёлтые круги x3 — попади = тройной урон, ебать.",
-  "Вкладка «Хуй» — качай удар. «Братва» — нанимаешь, они бьют сами.",
-  "Комбо = жми часто подряд, урон растёт.",
-  "Босс — жирный олег, долби пока таймер не кончился.",
-  "Кнопки снизу — скиллы. Жми когда готовы.",
+  "Это арена, не кликер — братва бьёт сама, ты выбираешь момент.",
+  "Олег качается с тобой — смотри его ур. на карточке.",
+  "Силы кончаются — не спами, жди восстановления.",
+  "Злость олега → ОТБИТЬ, иначе получишь по морде.",
+  "Мощный хуй — x3 урон, но кд и много сил.",
+  "Жёлтые x3 — слабое место, долби туда.",
 ];
 
 export const ARTIFACTS = [
@@ -224,6 +224,8 @@ export function defaultState() {
     enemyShield: 0,
     enemyType: "normal",
     enemySkin: "yard",
+    enemyLevel: 1,
+    enemyAtk: 3,
     enemyElement: "none",
     bossTimer: 0,
     bossPhase: 1,
@@ -274,6 +276,8 @@ export function migrateState(raw) {
   if (!raw.unlocks) raw.unlocks = [];
   if (!raw.objectivesDone) raw.objectivesDone = [];
   if (!raw.visitedZones) raw.visitedZones = [raw.zoneIdx || 0];
+  if (raw.enemyLevel == null) raw.enemyLevel = Math.max(1, raw.level || 1);
+  if (raw.enemyAtk == null) raw.enemyAtk = 3;
   if (!raw.zoneKills) raw.zoneKills = 0;
   if (raw.zoneBossPending == null) raw.zoneBossPending = false;
   return { ...d, ...raw, settings: { sound: true, fx: true, save: 30, ...raw.settings } };

@@ -2,6 +2,20 @@
 
 export const UNLOCKS = [
   {
+    id: "counter",
+    dock: null,
+    check: (s) => s.level >= 2,
+    title: "Олег бесится!",
+    text: "Полоска «Злость» — когда заполнится, жми ОТБИТЬ или получишь по морде.",
+  },
+  {
+    id: "heavy",
+    dock: null,
+    check: (s) => s.level >= 4,
+    title: "Мощный удар!",
+    text: "Кнопка 💥 — хуём с размаху. x3 урона, но жрёт выносливость.",
+  },
+  {
     id: "shop",
     dock: "shop",
     label: "Удары",

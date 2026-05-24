@@ -1,7 +1,8 @@
 import {
-  WEAPONS, CREW, RELICS, SKILLS, TALENTS, OLEG_SKINS, ENEMY_TYPES,
+  WEAPONS, CREW, RELICS, SKILLS, OLEG_SKINS, ENEMY_TYPES,
   ZONES, SIMPLE_TIPS, cost, fmt,
 } from "./data.js";
+import { buildOlegSvg, playHitAnim } from "./sprites.js";
 
 const HIT_WORDS = ["БАХ!", "ПЛЮХ!", "ХРЯСЬ!", "ЕБАШ!", "В ЖОПУ!", "ОЙ-ой!"];
 const CRIT_WORDS = ["ПИЗДЕЦ!", "РАЗЪЁБ!", "НАХУЙ!", "КРИТ, БЛЯ!"];
@@ -19,9 +20,11 @@ export class UI {
 
   cache() {
     const ids = [
-      "coins", "place-line", "hint-top", "enemy-badge", "enemy-name", "enemy-quote",
+      "coins", "place-line", "zone-map", "zone-desc", "zone-fill", "zone-progress-text",
+      "zone-boss-warn", "stage",
+      "enemy-badge", "enemy-name", "enemy-quote",
       "enemy-hp-text", "enemy-hp-fill", "boss-warn", "boss-timer",
-      "weak-left", "weak-right", "parry-prompt", "oleg-char", "oleg-shirt", "oleg-acc",
+      "weak-left", "weak-right", "parry-prompt", "oleg-char",
       "click-target", "combo-fill", "combo-mult", "combo-count",
       "dpc-display", "dps-display", "skills-dock", "player-level", "xp-fill",
       "shop-content", "event-ticker", "modal-overlay", "modal-body", "toasts",
@@ -56,11 +59,7 @@ export class UI {
   }
 
   fx(e, { dmg, crit, weak }) {
-    const ch = this.el["oleg-char"];
-    ch.classList.remove("hit", "crit-hit");
-    void ch.offsetWidth;
-    ch.classList.add(crit ? "crit-hit" : "hit");
-
+    playHitAnim(this.el["oleg-char"], crit);
     const x = e.clientX ?? innerWidth / 2;
     const y = e.clientY ?? innerHeight / 2;
     const words = weak ? WEAK_WORDS : crit ? CRIT_WORDS : HIT_WORDS;
@@ -112,19 +111,28 @@ export class UI {
 
   applySkin() {
     const skin = OLEG_SKINS.find((s) => s.id === this.g.state.enemySkin) || OLEG_SKINS[0];
-    const ch = this.el["oleg-char"];
-    ch.className = "oleg " + skin.css;
-    ch.style.setProperty("--shirt", skin.shirt);
-    ch.style.transform = `scale(${skin.scale || 1})`;
-    this.el["oleg-shirt"].style.background = skin.shirt;
+    this.el["oleg-char"].innerHTML = buildOlegSvg(skin.id);
     this.el["enemy-name"].textContent = skin.name;
     this.el["enemy-quote"].textContent = skin.quote;
-    const acc = this.el["oleg-acc"];
-    acc.className = "acc " + (skin.acc || "");
-    acc.textContent = {
-      cap: "🧢", crown: "👑", horns: "😈", glasses: "🤓", bottle: "🍺",
-      tie: "👔", antenna: "📡", sun: "☀", spikes: "⚡", belly: "🍔", angry: "💢",
-    }[skin.acc] || "";
+  }
+
+  renderZoneMap() {
+    const s = this.g.state;
+    const z = this.g.zone();
+    this.el["zone-map"].innerHTML = ZONES.map((zone, i) => {
+      const cls = i === s.zoneIdx ? "current" : s.unlockedZones.includes(i) ? "done" : "locked";
+      return `<div class="map-node ${cls}" title="${zone.desc} · ${zone.bonus}">
+        <span class="mn-ico">${zone.icon}</span>
+        <span class="mn-name">${zone.name}</span>
+      </div>`;
+    }).join("");
+
+    this.el["zone-desc"].textContent = `${z.icon} ${z.name} — ${z.desc} (${z.bonus})`;
+    const pct = Math.min(100, (s.zoneKills / z.kills) * 100);
+    this.el["zone-fill"].style.width = pct + "%";
+    this.el["zone-progress-text"].textContent = `${s.zoneKills} / ${z.kills} олегов`;
+    this.el.stage.className = "stage " + z.bg;
+    this.el["zone-boss-warn"].classList.toggle("hidden", !s.zoneBossPending);
   }
 
   renderShop() {
@@ -204,7 +212,8 @@ export class UI {
         <li><b>Вкладка «Хуй»</b> — качай удар сильнее.</li>
         <li><b>«Братва»</b> — нанимаешь, они бьют сами.</li>
         <li><b>Кнопки снизу</b> — скиллы. Жми когда не серые.</li>
-        <li>Разные олеги = разные типы. Босс — самый жирный.</li>
+        <li><b>Карта сверху</b> — локации. Убей N олегов → босс → новая зона.</li>
+        <li>Разные олеги выглядят по-разному. Босс — самый жирный.</li>
       </ol>
       <p class="help-note">Не парься с цифрами. Кликай и покупай.</p>
     `;
@@ -223,6 +232,7 @@ export class UI {
     this.el["enemy-badge"].className = "enemy-type type-" + s.enemyType;
 
     this.applySkin();
+    this.renderZoneMap();
 
     const hp = (s.enemyHp / s.enemyMaxHp) * 100;
     this.el["enemy-hp-fill"].style.width = hp + "%";
@@ -255,9 +265,6 @@ export class UI {
   init() {
     this.renderShop();
     this.update();
-    setInterval(() => {
-      this.el["hint-top"].textContent = SIMPLE_TIPS[Math.floor(Math.random() * SIMPLE_TIPS.length)];
-    }, 15000);
     setInterval(() => {
       if (!this.g.state.event?.msg) {
         this.el["event-ticker"].textContent = SIMPLE_TIPS[Math.floor(Math.random() * SIMPLE_TIPS.length)];

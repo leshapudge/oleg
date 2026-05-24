@@ -20,8 +20,14 @@
         <span class="money-label">Бабки</span>
         <span class="money-val" id="coins">0</span>
       </div>
-      <p class="hint-top" id="hint-top">Жми по жопе. Копишь бабки. Качаешь хуй. Всё.</p>
     </header>
+
+    <nav class="world-map" id="zone-map" aria-label="Локации"></nav>
+    <div class="zone-progress-bar">
+      <span id="zone-desc">Двор — олеги на лавочке</span>
+      <div class="zp-track"><div class="zp-fill" id="zone-fill"></div></div>
+      <span id="zone-progress-text">0 / 8</span>
+    </div>
 
     <main class="main-row">
       <section class="fight-zone">
@@ -35,21 +41,15 @@
             <div class="hp-bar"><div class="hp-fill" id="enemy-hp-fill"></div></div>
           </div>
 
-          <p class="boss-warn hidden" id="boss-warn">⚠ Босс сбежит через <b id="boss-timer">30</b> сек — долби быстрее!</p>
+          <p class="boss-warn hidden" id="boss-warn">⚠ Босс сбежит через <b id="boss-timer">30</b> сек!</p>
+          <p class="zone-boss-warn hidden" id="zone-boss-warn">👑 Следующий — БОСС ЛОКАЦИИ!</p>
 
-          <div class="stage">
-            <button class="spot spot-l hidden" id="weak-left" type="button">x3<br><small>сюда!</small></button>
-            <button class="spot spot-r hidden" id="weak-right" type="button">x3<br><small>сюда!</small></button>
+          <div class="stage bg-yard" id="stage">
+            <button class="spot spot-l hidden" id="weak-left" type="button">x3</button>
+            <button class="spot spot-r hidden" id="weak-right" type="button">x3</button>
             <button class="parry hidden" id="parry-prompt" type="button">ОТБИЛ!</button>
-
             <button class="hit-btn" id="click-target" type="button">
-              <div class="oleg type-yard" id="oleg-char">
-                <div class="acc" id="oleg-acc"></div>
-                <div class="oleg-head"><div class="face"></div></div>
-                <div class="oleg-shirt" id="oleg-shirt"></div>
-                <div class="oleg-ass" id="hit-zone"></div>
-                <div class="flash"></div>
-              </div>
+              <div class="oleg-wrap" id="oleg-char"></div>
               <span class="hit-label">ЖМИ ПО ЖОПЕ</span>
             </button>
           </div>
@@ -59,15 +59,12 @@
             <span>Комбо: <b id="combo-mult">x1</b> (<span id="combo-count">0</span>)</span>
             <span>Авто: <b id="dps-display">0</b>/сек</span>
           </div>
-
           <div class="combo-bar-wrap">
             <div class="combo-bar"><div class="combo-fill" id="combo-fill"></div></div>
           </div>
-
           <div class="skills" id="skills-dock"></div>
         </div>
-
-        <p class="tip-line" id="event-ticker">Короче: кликай, качай, profit.</p>
+        <p class="tip-line" id="event-ticker">Кликай → бабки → качай хуй</p>
       </section>
 
       <aside class="shop-zone">
@@ -75,14 +72,12 @@
           <span>Ты ур. <b id="player-level">1</b></span>
           <div class="xp-bar"><div class="xp-fill" id="xp-fill"></div></div>
         </div>
-
         <nav class="tabs">
           <button class="tab active" data-tab="weapon">Хуй</button>
           <button class="tab" data-tab="crew">Братва</button>
           <button class="tab" data-tab="more">Ещё</button>
         </nav>
         <div class="shop-list" id="shop-content"></div>
-
         <button class="help-btn" id="btn-help">❓ Как играть</button>
       </aside>
     </main>
@@ -95,7 +90,6 @@
     </div>
   </div>
   <div class="toasts" id="toasts"></div>
-
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

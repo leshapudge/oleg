@@ -38,6 +38,16 @@ export class Game {
     return { ...z, loopMult: 1 + loop * 0.45 };
   }
 
+  zoneBonus(type) {
+    const idx = this.state.zoneIdx;
+    if (idx >= 6) return type === "all" ? 2 : 1;
+    if (type === "coin" && idx >= 1) return 1 + idx * 0.05;
+    if (type === "xp" && idx >= 3) return 1 + idx * 0.05;
+    if (type === "dmg" && idx >= 4) return 1 + idx * 0.04;
+    if (type === "dps" && idx >= 5) return 1 + idx * 0.05;
+    return 1;
+  }
+
   hasTalent(id) { return this.state.talents.includes(id); }
 
   talentMult(type) {
@@ -222,6 +232,7 @@ export class Game {
     const k = this.state.killsInWave;
 
     if (k > 0 && k % 12 === 0) { type = "boss"; this.state.bossTimer = 35; this.state.bossPhase = 1; }
+    else if (this.state.zoneBossPending) { type = "boss"; this.state.bossTimer = 40; this.state.bossPhase = 1; this.state.zoneBossPending = false; }
     else if (k > 0 && k % 7 === 0) type = "mini";
     else if (k > 0 && k % 4 === 0) type = "elite";
 
@@ -287,6 +298,8 @@ export class Game {
     if (this.state.event?.coin) coins *= this.state.event.coin;
     if (this.state.mutator?.id === "greedy") coins *= 2;
 
+    coins *= this.zoneBonus("coin");
+    if (this.state.zoneIdx >= 6) coins *= 2;
     coins = Math.floor(coins);
     this.state.coins += coins;
     this.state.coinsEarned += coins;
@@ -307,15 +320,25 @@ export class Game {
     this.killStreak++;
     this.streakT = 8000;
 
+    this.state.zoneKills++;
+    const z = this.zone();
+    if (this.state.zoneKills >= z.kills && this.state.enemyType === "boss") {
+      if (this.state.zoneIdx < ZONES.length - 1) {
+        this.state.zoneIdx++;
+        this.state.zoneKills = 0;
+        if (!this.state.unlockedZones.includes(this.state.zoneIdx))
+          this.state.unlockedZones.push(this.state.zoneIdx);
+        this.emit("zoneClear", ZONES[this.state.zoneIdx]);
+      }
+    } else if (this.state.zoneKills >= z.kills && !this.state.zoneBossPending) {
+      this.state.zoneBossPending = true;
+      this.emit("zoneBossSoon");
+    }
+
     this.state.killsInWave++;
     if (this.state.killsInWave >= 14) {
       this.state.wave++;
       this.state.killsInWave = 0;
-      if (this.state.wave % ZONES.length === 1) {
-        this.state.zoneIdx = Math.min(this.state.zoneIdx + 1, ZONES.length - 1);
-        if (!this.state.unlockedZones.includes(this.state.zoneIdx))
-          this.state.unlockedZones.push(this.state.zoneIdx);
-      }
       this.pickMutator();
       this.emit("wave", this.state.wave);
     }
@@ -623,7 +646,7 @@ export class Game {
 function defaultState() {
   return {
     coins: 0, souls: 0, essence: 0, prestigePts: 0, prestigeCount: 0,
-    wave: 1, zoneIdx: 0, killsInWave: 0, level: 1, xp: 0,
+    wave: 1, zoneIdx: 0, zoneKills: 0, zoneBossPending: false, killsInWave: 0, level: 1, xp: 0,
     weapons: {}, crew: {}, elements: {}, relics: {}, research: {}, talents: [],
     artifacts: [null, null, null], inventory: {},
     clicks: 0, damage: 0, coinsEarned: 0, crits: 0, bossKills: 0,

@@ -1,13 +1,13 @@
 export const SAVE_KEY = "oleg_simulator_save_v3";
 
 export const ZONES = [
-  { id: "yard", name: "Двор", hp: 1, coins: 1, unlock: 1 },
-  { id: "pod", name: "Подъезд", hp: 1.35, coins: 1.12, unlock: 3 },
-  { id: "beach", name: "Пляж", hp: 1.8, coins: 1.25, unlock: 6 },
-  { id: "office", name: "Офис", hp: 2.4, coins: 1.4, unlock: 10 },
-  { id: "banya", name: "Баня", hp: 3.2, coins: 1.6, unlock: 15 },
-  { id: "space", name: "Космос", hp: 4.5, coins: 1.9, unlock: 22 },
-  { id: "hell", name: "Ад Олега", hp: 7, coins: 2.5, unlock: 30 },
+  { id: "yard", name: "Двор", icon: "🏠", desc: "Олеги на лавочке. Старт.", hp: 1, coins: 1, kills: 8, bg: "bg-yard", bonus: "+0% бабок" },
+  { id: "pod", name: "Подъезд", icon: "🚪", desc: "Запах мочи и олеги.", hp: 1.35, coins: 1.15, kills: 10, bg: "bg-pod", bonus: "+5% бабок" },
+  { id: "beach", name: "Пляж", icon: "🏖", desc: "Загорелые жопы.", hp: 1.8, coins: 1.3, kills: 12, bg: "bg-beach", bonus: "+10% бабок" },
+  { id: "office", name: "Офис", icon: "🏢", desc: "Олеги в галстуках.", hp: 2.4, coins: 1.45, kills: 14, bg: "bg-office", bonus: "+15% XP" },
+  { id: "banya", name: "Баня", icon: "🧖", desc: "Горячие жопы.", hp: 3.2, coins: 1.65, kills: 16, bg: "bg-banya", bonus: "+20% урон" },
+  { id: "space", name: "Космос", icon: "🚀", desc: "Олеги на орбите.", hp: 4.5, coins: 1.95, kills: 18, bg: "bg-space", bonus: "+25% авто-DPS" },
+  { id: "hell", name: "Ад Олега", icon: "🔥", desc: "Финал. Пиздец.", hp: 7, coins: 2.6, kills: 20, bg: "bg-hell", bonus: "x2 всё" },
 ];
 
 export const ENEMY_TYPES = {
@@ -195,6 +195,8 @@ export function defaultState() {
     prestigeCount: 0,
     wave: 1,
     zoneIdx: 0,
+    zoneKills: 0,
+    zoneBossPending: false,
     killsInWave: 0,
     level: 1,
     xp: 0,
@@ -255,6 +257,7 @@ export function migrateState(raw) {
   }
   if (raw.prestigePoints != null) raw.prestigePts = raw.prestigePoints;
   if (raw.playerLevel != null) raw.level = raw.playerLevel;
-  if (raw.totalClicks != null) raw.clicks = raw.totalClicks;
+    if (!raw.zoneKills) raw.zoneKills = 0;
+    if (raw.zoneBossPending == null) raw.zoneBossPending = false;
   return { ...d, ...raw, settings: { sound: true, fx: true, save: 30, ...raw.settings } };
 }

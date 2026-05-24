@@ -45,6 +45,12 @@ game.on((ev, data) => {
     case "phase":
       ui.toast(`Босс бесится — фаза ${data}!`);
       break;
+    case "zoneClear":
+      ui.toast(`Новая локация: ${data.icon} ${data.name}! ${data.bonus}`);
+      break;
+    case "zoneBossSoon":
+      ui.toast("Босс локации на подходе — готовь жопу!");
+      break;
     case "prestige":
       ui.toast(`Престиж +${data}★. Начинаем заново, но мощнее.`);
       break;

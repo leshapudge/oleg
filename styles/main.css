@@ -338,6 +338,34 @@ body {
   transition: width 0.12s;
 }
 
+.shield-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.62rem;
+  color: var(--blue);
+}
+
+.shield-label { white-space: nowrap; }
+
+.shield-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 99px;
+  overflow: hidden;
+  border: 1px solid rgba(76, 201, 240, 0.3);
+}
+
+.shield-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--blue), #7b8cde);
+  border-radius: 99px;
+  transition: width 0.12s;
+}
+
 .boss-warn {
   text-align: center;
   color: var(--red);

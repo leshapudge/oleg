@@ -11,6 +11,7 @@ const game = new Game(state);
 const ui = new UI(game);
 
 if (!state.enemyMaxHp || state.enemyHp <= 0) game.spawnEnemy();
+game.fixBrokenEnemy();
 game.checkProgress();
 
 function checkAchievements() {

@@ -46,6 +46,9 @@ export class Game {
       if (u.check(this.state, this)) {
         if (!this.state.unlocks) this.state.unlocks = [];
         this.state.unlocks.push(u.id);
+        if (u.id === "crew" && !this.lv(this.state.crew, "bro")) {
+          this.state.crew.bro = 1;
+        }
         this.emit("unlock", u);
       }
     }
@@ -215,8 +218,15 @@ export class Game {
       dps += c.dps(l);
       if (c.coin) this._crewCoin *= c.coin(l);
     }
+    if (dps <= 0) return 0;
+
+    const eq = this.equipStats();
+    dps += eq.dmg * 0.4;
+
     const weight = WEAPONS.find((x) => x.id === "weight");
     dps *= weight ? weight.fx(this.lv(this.state.weapons, "weight")) : 1;
+    dps *= this.masteryCombatMult();
+    dps *= this.zoneBonus("dmg");
     dps *= this.prestigeMult();
     dps *= this.relicMult("dmg");
     dps *= this.relicMult("dps");
@@ -225,7 +235,7 @@ export class Game {
     dps *= this.artifactMult().dmg;
     if (this.state.buffs.slap) dps *= 8;
     if (this.state.event?.dmg) dps *= this.state.event.dmg;
-    return dps;
+    return Math.max(0, dps);
   }
 
   rollHit(isClick = true) {
@@ -256,16 +266,15 @@ export class Game {
   }
 
   playerPower() {
-    return Math.max(3, this.clickDamage() + this.autoDps() * 1.8);
+    return Math.max(5, this.clickDamage() + this.autoDps() * 2.2);
   }
 
   calcBaseEnemyLevel() {
     const s = this.state;
-    let lv = s.level;
-    lv += Math.floor(s.wave / 2);
-    lv += Math.floor(s.zoneIdx * 0.6);
-    lv += Math.floor(s.prestigePts * 1.2);
-    lv += Math.floor(this.masteryLv("combat") / 2);
+    let lv = Math.floor(s.level * 0.6);
+    lv += Math.floor(s.wave / 3);
+    lv += Math.floor(s.zoneIdx * 0.4);
+    lv += Math.floor(s.prestigePts * 0.8);
     return Math.max(1, lv);
   }
 
@@ -273,14 +282,16 @@ export class Game {
     const et = ENEMY_TYPES[type];
     const z = this.zone();
     const power = this.playerPower();
-    const ttk = { normal: 11, elite: 16, mini: 22, boss: 40 }[type] || 11;
-    let hp = Math.max(35, power * ttk * 0.38) * et.hp * z.hp;
-    hp *= Math.pow(1.065, enemyLv - 1);
+    const ttk = { normal: 10, elite: 14, mini: 18, boss: 25 }[type] || 10;
+    let hp = power * ttk * et.hp * 0.22 * z.hp;
+    hp *= 1 + (enemyLv - 1) * 0.05;
     hp *= z.loopMult;
-    if (this.state.mutator?.id === "armored") hp *= 1.5;
-    if (this.state.mutator?.id === "greedy") hp *= 1.3;
-    if (this.state.mutator?.id === "thin") hp *= 0.7;
-    return Math.floor(hp);
+    if (this.state.mutator?.id === "armored") hp *= 1.25;
+    if (this.state.mutator?.id === "greedy") hp *= 1.2;
+    if (this.state.mutator?.id === "thin") hp *= 0.75;
+    const cap = power * ttk * et.hp * 0.9;
+    hp = Math.min(hp, cap);
+    return Math.max(20, Math.floor(hp));
   }
 
   spawnEnemy() {
@@ -288,7 +299,7 @@ export class Game {
     let type = "normal";
     const k = this.state.killsInWave;
 
-    if (k > 0 && k % 12 === 0) { type = "boss"; this.state.bossTimer = 35; this.state.bossPhase = 1; }
+    if (k > 0 && k % 12 === 0 && this.state.wave >= 3) { type = "boss"; this.state.bossTimer = 35; this.state.bossPhase = 1; }
     else if (this.state.zoneBossPending) { type = "boss"; this.state.bossTimer = 40; this.state.bossPhase = 1; this.state.zoneBossPending = false; }
     else if (k > 0 && k % 7 === 0) type = "mini";
     else if (k > 0 && k % 4 === 0) type = "elite";
@@ -320,17 +331,24 @@ export class Game {
   }
 
   dealDamage(amount, src = "click", opts = {}) {
-    let dmg = amount;
+    let dmg = Math.max(0, Math.floor(amount));
+    if (dmg <= 0) return 0;
+
+    if (opts.weak) dmg = Math.floor(dmg * 3);
+
     const pierce = WEAPONS.find((x) => x.id === "pierce");
     const piercePct = pierce ? pierce.fx(this.lv(this.state.weapons, "pierce")) : 0;
 
     if (this.state.enemyShield > 0) {
-      const toShield = Math.floor(dmg * (1 - piercePct));
+      let toShield = Math.floor(dmg * (1 - piercePct) * 0.65);
+      let toHp = dmg - toShield;
+      if (toShield > this.state.enemyShield) {
+        toHp += toShield - this.state.enemyShield;
+        toShield = this.state.enemyShield;
+      }
       this.state.enemyShield = Math.max(0, this.state.enemyShield - toShield);
-      dmg = Math.floor(dmg * piercePct) + Math.max(0, dmg - toShield);
+      dmg = Math.max(1, toHp);
     }
-
-    if (opts.weak) dmg = Math.floor(dmg * 3);
 
     this.state.enemyHp = Math.max(0, this.state.enemyHp - dmg);
     this.state.damage += dmg;
@@ -339,6 +357,17 @@ export class Game {
     if (src === "auto" && dmg >= 1) this.emit("autoHit", dmg);
     this.emit("hit", { dmg, src, ...opts });
     return dmg;
+  }
+
+  fixBrokenEnemy() {
+    const power = this.playerPower();
+    const maxOk = Math.max(800, power * 80);
+    const s = this.state;
+    if (!Number.isFinite(s.enemyMaxHp) || s.enemyMaxHp > maxOk || s.enemyHp <= 0 || s.enemyHp > s.enemyMaxHp) {
+      this.spawnEnemy();
+      return true;
+    }
+    return false;
   }
 
   killEnemy() {

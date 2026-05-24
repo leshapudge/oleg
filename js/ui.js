@@ -56,7 +56,7 @@ export class UI {
       "coins", "place-line", "dock", "panel-title", "panel-content",
       "objective-text", "objective-reward", "objective", "stage",
       "enemy-badge", "enemy-name", "enemy-quote", "enemy-level", "enemy-atk-display",
-      "enemy-hp-text", "enemy-hp-fill", "boss-warn", "boss-timer",
+      "enemy-hp-text", "enemy-hp-fill", "shield-row", "shield-fill", "boss-warn", "boss-timer",
       "weak-left", "weak-right", "parry-prompt", "oleg-char", "heavy-strike",
       "click-target", "combo-fill", "combo-mult",
       "heat-fill", "stamina-fill", "oleg-rage-fill", "oleg-rage-wrap",
@@ -517,6 +517,13 @@ export class UI {
     const hp = (s.enemyHp / s.enemyMaxHp) * 100;
     this.el["enemy-hp-fill"].style.width = hp + "%";
     this.el["enemy-hp-text"].textContent = `${fmt(s.enemyHp)} / ${fmt(s.enemyMaxHp)}`;
+
+    const hasShield = s.enemyShield > 0;
+    this.el["shield-row"]?.classList.toggle("hidden", !hasShield);
+    if (hasShield && this.el["shield-fill"]) {
+      const shPct = (s.enemyShield / (s.enemyMaxHp * 0.3)) * 100;
+      this.el["shield-fill"].style.width = Math.min(100, shPct) + "%";
+    }
 
     if (s.enemyType === "boss" && s.bossTimer > 0) {
       this.el["boss-warn"].classList.remove("hidden");

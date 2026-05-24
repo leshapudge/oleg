@@ -12,9 +12,9 @@ export const ZONES = [
 
 export const ENEMY_TYPES = {
   normal: { tag: "Обычный хуй", hp: 1, coins: 1, xp: 1 },
-  elite: { tag: "Задрот-элита", hp: 2.8, coins: 2.2, xp: 1.6 },
-  mini: { tag: "Жирный мини-босс", hp: 5, coins: 3.5, xp: 2.2 },
-  boss: { tag: "ПАХАН ОЛЕГ", hp: 12, coins: 6, xp: 4 },
+  elite: { tag: "Задрот-элита", hp: 2.2, coins: 2.2, xp: 1.6 },
+  mini: { tag: "Жирный мини-босс", hp: 3.5, coins: 3.5, xp: 2.2 },
+  boss: { tag: "ПАХАН ОЛЕГ", hp: 5, coins: 6, xp: 4 },
 };
 
 /** Разные олеги — разный вид и имена */
@@ -201,7 +201,7 @@ export function defaultState() {
     level: 1,
     xp: 0,
     weapons: {},
-    crew: {},
+    crew: { bro: 1 },
     elements: {},
     relics: {},
     research: {},
@@ -270,6 +270,7 @@ export function migrateState(raw) {
   if (raw.totalClicks != null) raw.clicks = raw.totalClicks;
   if (!raw.materials) raw.materials = {};
   if (!raw.items) raw.items = {};
+  if (!raw.crew || Object.keys(raw.crew).length === 0) raw.crew = { bro: 1 };
   if (!raw.equip) raw.equip = { weapon: null, armor: null, tool: null, trinket: null };
   if (!raw.masteries) raw.masteries = { combat: 0, fishing: 0, craft: 0, endurance: 0, scavenge: 0 };
   if (raw.activityCd == null) raw.activityCd = 0;

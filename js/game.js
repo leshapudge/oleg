@@ -1,5 +1,5 @@
 import {
-  ZONES, ENEMY_TYPES, ELEMENTS, MUTATORS, WEAPONS, CREW,
+  ZONES, ENEMY_TYPES, pickOlegSkin, OLEG_SKINS, ELEMENTS, MUTATORS, WEAPONS, CREW,
   ELEMENT_UPGRADES, RELICS, RESEARCH, SKILLS, ARTIFACTS,
   CONSUMABLES, CHALLENGES, TALENTS, EVENTS, cost,
 } from "./data.js";
@@ -235,6 +235,8 @@ export class Game {
     const els = ["fire", "ice", "shock"];
     this.state.enemyElement = type === "normal" ? "none" : els[Math.floor(Math.random() * els.length)];
     this.state.enemyType = type;
+    const skin = pickOlegSkin(type, this.state.zoneIdx);
+    this.state.enemySkin = skin.id;
     this.state.enemyMaxHp = Math.floor(hp);
     this.state.enemyHp = this.state.enemyMaxHp;
     this.state.enemyShield = this.state.mutator?.id === "armored" ? Math.floor(hp * 0.25) : 0;

@@ -11,11 +11,45 @@ export const ZONES = [
 ];
 
 export const ENEMY_TYPES = {
-  normal: { tag: "ОБЫЧНЫЙ", hp: 1, coins: 1, xp: 1 },
-  elite: { tag: "ЭЛИТА", hp: 2.8, coins: 2.2, xp: 1.6 },
-  mini: { tag: "МИНИ-БОСС", hp: 5, coins: 3.5, xp: 2.2 },
-  boss: { tag: "БОСС", hp: 12, coins: 6, xp: 4 },
+  normal: { tag: "Обычный хуй", hp: 1, coins: 1, xp: 1 },
+  elite: { tag: "Задрот-элита", hp: 2.8, coins: 2.2, xp: 1.6 },
+  mini: { tag: "Жирный мини-босс", hp: 5, coins: 3.5, xp: 2.2 },
+  boss: { tag: "ПАХАН ОЛЕГ", hp: 12, coins: 6, xp: 4 },
 };
+
+/** Разные олеги — разный вид и имена */
+export const OLEG_SKINS = [
+  { id: "yard", name: "Олег-дворник", quote: "«Я тут просто сорняки полол, бля»", css: "type-yard", shirt: "#3d6b4f", scale: 1 },
+  { id: "gop", name: "Олег-гopник", quote: "«Чё уставился, нахуй?»", css: "type-gop", shirt: "#1a1a2e", scale: 1, acc: "cap" },
+  { id: "fat", name: "Олег-борщ", quote: "«После борща жопа сама просится»", css: "type-fat", shirt: "#8b3a3a", scale: 1.25, acc: "belly" },
+  { id: "it", name: "Олег-айтишник", quote: "«Я на митинге, не трогай»", css: "type-it", shirt: "#2c5282", scale: 0.95, acc: "glasses" },
+  { id: "drunk", name: "Олег-пьяный", quote: "«Эээ... кто ты?»", css: "type-drunk", shirt: "#5c4033", scale: 1.05, acc: "bottle" },
+  { id: "beach", name: "Олег-загорелый", quote: "«Мазал крем, не туда попал»", css: "type-beach", shirt: "#ff6b35", scale: 1, acc: "sun" },
+  { id: "office", name: "Олег-начальник", quote: "«Отчёт по жопе к пятнице!»", css: "type-office", shirt: "#333", scale: 1.1, acc: "tie" },
+  { id: "alien", name: "Олег-инопланетянин", quote: "«Земная жопа — лучшая жопа»", css: "type-alien", shirt: "#4a0", scale: 1.15, acc: "antenna" },
+  { id: "elite", name: "Олег-качок", quote: "«Жопа стальная, попробуй»", css: "type-elite", shirt: "#444", scale: 1.2, acc: "spikes" },
+  { id: "mini", name: "Олег-батон", quote: "«Я маленький, но злой, сука»", css: "type-mini", shirt: "#963", scale: 0.75, acc: "angry" },
+  { id: "boss", name: "ПАХАН ОЛЕГ", quote: "«Ты кто такой, чтобы мою жопу трогать?!»", css: "type-boss", shirt: "#111", scale: 1.55, acc: "crown" },
+  { id: "hell", name: "Олег из ада", quote: "«Добро пожаловать в жопу, смертный»", css: "type-hell", shirt: "#600", scale: 1.4, acc: "horns" },
+];
+
+export function pickOlegSkin(enemyType, zoneIdx) {
+  if (enemyType === "boss") return OLEG_SKINS.find((s) => s.id === "boss") || OLEG_SKINS[0];
+  if (enemyType === "mini") return OLEG_SKINS.find((s) => s.id === "mini") || OLEG_SKINS[0];
+  if (enemyType === "elite") return OLEG_SKINS.find((s) => s.id === "elite") || OLEG_SKINS[0];
+  const zoneSkins = [
+    ["yard", "gop", "drunk"],
+    ["yard", "gop", "fat"],
+    ["beach", "drunk", "fat"],
+    ["office", "it", "office"],
+    ["fat", "drunk", "yard"],
+    ["alien", "it", "elite"],
+    ["hell", "alien", "drunk"],
+  ];
+  const pool = zoneSkins[Math.min(zoneIdx, zoneSkins.length - 1)] || zoneSkins[0];
+  const id = pool[Math.floor(Math.random() * pool.length)];
+  return OLEG_SKINS.find((s) => s.id === id) || OLEG_SKINS[0];
+}
 
 export const ELEMENTS = {
   none: { name: "—", color: "#888", weak: null },
@@ -34,21 +68,20 @@ export const MUTATORS = [
 ];
 
 export const WEAPONS = [
-  { id: "base", name: "Базовый", icon: "⚔", desc: "+урон за клик", base: 12, mult: 1.14, fx: (l) => l * 3 + 2 },
-  { id: "weight", name: "Утяжелитель", icon: "⬛", desc: "+% ко всему урону", base: 45, mult: 1.16, fx: (l) => 1 + l * 0.06 },
-  { id: "speed", name: "Темп", icon: "💨", desc: "окно комбо +% ", base: 70, mult: 1.18, fx: (l) => 1800 + l * 350 },
-  { id: "crit", name: "Прицел", icon: "◎", desc: "шанс крита", base: 100, mult: 1.2, fx: (l) => 0.04 + l * 0.018, max: 45 },
-  { id: "critd", name: "Разнос", icon: "✦", desc: "множ. крита", base: 180, mult: 1.22, fx: (l) => 2 + l * 0.3 },
-  { id: "chain", name: "Цепь", icon: "⛓", desc: "шанс двойного удара", base: 400, mult: 1.28, fx: (l) => l * 0.025, max: 30 },
-  { id: "pierce", name: "Пробой", icon: "▶", desc: "игнор % щита", base: 600, mult: 1.3, fx: (l) => l * 0.05, max: 20 },
+  { id: "base", name: "Размер хуя", icon: "🍆", desc: "Бьёшь сильнее", base: 12, mult: 1.14, fx: (l) => l * 3 + 2 },
+  { id: "weight", name: "Жёсткость", icon: "💪", desc: "Весь урон круче", base: 45, mult: 1.16, fx: (l) => 1 + l * 0.06 },
+  { id: "speed", name: "Смазка", icon: "🧴", desc: "Комбо дольше держится", base: 70, mult: 1.18, fx: (l) => 1800 + l * 350 },
+  { id: "crit", name: "Точка", icon: "🎯", desc: "Шанс ебануть критом", base: 100, mult: 1.2, fx: (l) => 0.04 + l * 0.018, max: 45 },
+  { id: "critd", name: "Разъёб", icon: "💥", desc: "Крит больнее", base: 180, mult: 1.22, fx: (l) => 2 + l * 0.3 },
+  { id: "chain", name: "Дупlex", icon: "⚡", desc: "Два удара подряд", base: 400, mult: 1.28, fx: (l) => l * 0.025, max: 30 },
 ];
 
 export const CREW = [
-  { id: "bro", name: "Братан", icon: "🧔", desc: "слабый DPS", base: 20, mult: 1.11, dps: (l) => l * 0.8 },
-  { id: "gop", name: "Гопник", icon: "🧢", desc: "средний DPS", base: 120, mult: 1.13, dps: (l) => l * 3.5 },
-  { id: "it", name: "Айтишник", icon: "💻", desc: "DPS + снижает жар", base: 600, mult: 1.15, dps: (l) => l * 14, heatRed: (l) => l * 0.02 },
-  { id: "babka", name: "Бабка", icon: "👵", desc: "DPS + монеты", base: 3500, mult: 1.17, dps: (l) => l * 55, coin: (l) => 1 + l * 0.025 },
-  { id: "ufo", name: "НЛО", icon: "🛸", desc: "космический DPS", base: 25000, mult: 1.2, dps: (l) => l * 280 },
+  { id: "bro", name: "Братан", icon: "🧔", desc: "Сам бьёт слабо", base: 20, mult: 1.11, dps: (l) => l * 0.8 },
+  { id: "gop", name: "Гопник", icon: "🧢", desc: "Пинает нормально", base: 120, mult: 1.13, dps: (l) => l * 3.5 },
+  { id: "it", name: "Айтишник", icon: "💻", desc: "Бьёт + не перегреваешься", base: 600, mult: 1.15, dps: (l) => l * 14, heatRed: (l) => l * 0.02 },
+  { id: "babka", name: "Бабка", icon: "👵", desc: "Охуенный DPS + бабки", base: 3500, mult: 1.17, dps: (l) => l * 55, coin: (l) => 1 + l * 0.025 },
+  { id: "ufo", name: "НЛО", icon: "🛸", desc: "Ебашит из космоса", base: 25000, mult: 1.2, dps: (l) => l * 280 },
 ];
 
 export const ELEMENT_UPGRADES = [
@@ -74,12 +107,20 @@ export const RESEARCH = [
 ];
 
 export const SKILLS = [
-  { id: "slap", name: "Шлёпок", icon: "👋", cd: 12, dur: 6, desc: "x8 урон" },
-  { id: "frenzy", name: "Шквал", icon: "🌪", cd: 25, dur: 7, desc: "авто-клики" },
-  { id: "gold", name: "Дождь ₽", icon: "🪙", cd: 40, dur: 10, desc: "x4 монеты" },
-  { id: "freeze", name: "Стуз", icon: "🧊", cd: 50, dur: 10, desc: "стоп регen" },
-  { id: "nuke", name: "Ядерный", icon: "☢", cd: 90, dur: 0, desc: "30% HP босса" },
-  { id: "rage", name: "Берсерк", icon: "🔥", cd: 35, dur: 8, desc: "100% ярость" },
+  { id: "slap", name: "Мегахуй", icon: "👊", cd: 12, dur: 6, desc: "x8 урона — разъеб" },
+  { id: "frenzy", name: "Ебаш-авто", icon: "🌪", cd: 25, dur: 7, desc: "Сам долбит" },
+  { id: "gold", name: "Бабло", icon: "💸", cd: 40, dur: 10, desc: "x4 бабки" },
+  { id: "freeze", name: "Стуз", icon: "🧊", cd: 50, dur: 10, desc: "Олег не лечится" },
+  { id: "nuke", name: "Ядерный хуй", icon: "☢", cd: 90, dur: 0, desc: "30% HP боссу" },
+];
+
+export const SIMPLE_TIPS = [
+  "Жми по жопе = бабки. Всё просто.",
+  "Жёлтые круги x3 — попади = тройной урон, ебать.",
+  "Вкладка «Хуй» — качай удар. «Братва» — нанимаешь, они бьют сами.",
+  "Комбо = жми часто подряд, урон растёт.",
+  "Босс — жирный олег, долби пока таймер не кончился.",
+  "Кнопки снизу — скиллы. Жми когда готовы.",
 ];
 
 export const ARTIFACTS = [
@@ -128,11 +169,9 @@ export const ACHIEVEMENTS = [
 ];
 
 export const EVENTS = [
-  { id: "gold", msg: "ЗОЛОТАЯ ЛИХОРАДКА — x2 ₽!", coin: 2, dur: 25 },
-  { id: "dmg", msg: "АДРЕНАЛИН — +60% урон!", dmg: 1.6, dur: 20 },
-  { id: "crit", msg: "ТОЧНЫЙ ЧАС — +25% крит!", crit: 0.25, dur: 18 },
-  { id: "loot", msg: "СУЕТА — x3 лут!", loot: 3, dur: 22 },
-  { id: "slow", msg: "ЗАМЕДЛЕНИЕ — легче комбо!", combo: 1.5, dur: 15 },
+  { id: "gold", msg: "БАБЛО ЛЬЁТСЯ — x2 деньги, сука!", coin: 2, dur: 25 },
+  { id: "dmg", msg: "АДренalin — +60% разъёб!", dmg: 1.6, dur: 20 },
+  { id: "crit", msg: "Криты летят — +25% шанс!", crit: 0.25, dur: 18 },
 ];
 
 export function cost(item, lv) {
@@ -182,6 +221,7 @@ export function defaultState() {
     enemyMaxHp: 80,
     enemyShield: 0,
     enemyType: "normal",
+    enemySkin: "yard",
     enemyElement: "none",
     bossTimer: 0,
     bossPhase: 1,

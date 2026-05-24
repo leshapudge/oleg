@@ -15,7 +15,7 @@ function checkAchievements() {
     if (a.ok(state)) {
       state.achievements.push(a.id);
       state.coins += 50 * state.achievements.length;
-      ui.toast(`🏆 ${a.name}`);
+      ui.toast(`🏆 ${a.name} — ${a.desc}`);
     }
   }
 }
@@ -23,36 +23,30 @@ function checkAchievements() {
 game.on((ev, data) => {
   switch (ev) {
     case "level":
-      ui.toast(`УРОВЕНЬ ${data}!`);
-      if (state.settings.sound) ui.snd("level");
+      ui.toast(`Уровень ${data}! Ты становишься опаснее.`);
+      if (state.settings.sound) ui.snd("crit");
       break;
     case "wave":
-      ui.toast(`Волна ${data}!`);
+      ui.toast(`Волна ${data}. Новый олег, новые проблемы.`);
       break;
     case "kill":
       if (state.settings.sound) ui.snd("hit");
       checkAchievements();
       break;
+    case "spawn":
+      ui.update();
+      break;
     case "event":
       ui.toast(data.msg);
       break;
-    case "loot":
-      ui.toast(`Лут: ${data}`);
-      break;
-    case "artifact":
-      ui.toast(`Артефакт: ${data.name}!`);
-      break;
     case "bossFail":
-      ui.toast("Босс сбежал!");
+      ui.toast("Босс съебался! В следующий раз долби быстрее.");
       break;
     case "phase":
-      ui.toast(`Фаза босса ${data}!`);
-      break;
-    case "challenge":
-      ui.toast(`Челлендж: +${data.reward}₽`);
+      ui.toast(`Босс бесится — фаза ${data}!`);
       break;
     case "prestige":
-      ui.toast(`Престиж +${data} ★`);
+      ui.toast(`Престиж +${data}★. Начинаем заново, но мощнее.`);
       break;
   }
   if (ev !== "tick" && ev !== "hit") ui.update();
@@ -63,15 +57,12 @@ checkAchievements();
 
 let last = performance.now();
 function loop(now) {
-  const dt = Math.min(now - last, 50);
+  game.tick(Math.min(now - last, 50));
   last = now;
-  game.tick(dt);
-  if (Math.floor(now / 100) % 2 === 0) ui.update();
+  if (Math.floor(now / 150) % 2 === 0) ui.update();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
 setInterval(() => saveGame(state), (state.settings?.save || 30) * 1000);
 window.addEventListener("beforeunload", () => saveGame(state));
-
-console.log("%c ОЛЕГБОЙ v3 ", "background:#b8ff3c;color:#102010;font-weight:bold;padding:4px 8px");
